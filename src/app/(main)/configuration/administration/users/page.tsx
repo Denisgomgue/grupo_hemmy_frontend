@@ -120,9 +120,12 @@ export default function UsersPage() {
                     headers={headers}
                     data={paginatedData}
                     isLoading={isLoading}
-                    totalRecords={users.length}
-                    pageSize={pageSize}
-                    onPaginationChange={handlePaginationChange}
+                    pagination={{
+                        totalRecords: users.length,
+                        pageSize: pageSize,
+                        onPaginationChange: handlePaginationChange,
+                        currentPage: currentPage
+                    }}
                     actions={(row: User) => <ActionsCell rowData={row} />}
                 />
             </div>

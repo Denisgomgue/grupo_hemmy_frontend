@@ -22,9 +22,9 @@ export interface Payment {
     reconnection: boolean;
     amount: number;
     state: PaymentStatus;
-    paymentType?: PaymentType;
-    transfername: string;
-    discount: number;
+    paymentType: PaymentType;
+    transfername?: string;
+    discount?: number;
     dueDate?: string;
     client: Client;
     created_At: string;

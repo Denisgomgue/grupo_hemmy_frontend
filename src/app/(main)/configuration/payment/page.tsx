@@ -1,11 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
 import type { Payment } from "@/types/payments/payment"
 import { usePayments } from "@/hooks/use-payment"
-import api from "@/lib/axios"
 import { PaymentForm } from "./_components/payment-form"
 import { ResponsiveTable } from "@/components/responsive-table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -25,104 +24,74 @@ import { Button } from "@/components/ui/button"
 import { LayoutGrid, List, Search } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ColumnDef } from "@tanstack/react-table"
+import { useState, useEffect } from "react"
 
 export default function PaymentPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const [isModalOpen, setIsModalOpen] = React.useState(false)
-  const [selectedPayment, setSelectedPayment] = React.useState<Payment | null>(null)
-  const [currentPage, setCurrentPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(10)
-  const [totalRecords, setTotalRecords] = React.useState(0)
-  const [currentFilter, setCurrentFilter] = React.useState("ALL")
-  const [searchTerm, setSearchTerm] = React.useState("")
-  const [viewMode, setViewMode] = React.useState<"list" | "grid">("list")
-
-  const fetchPaymentSummary = async () => {
-    const response = await api.get("/payments/summary");
-    return response.data;
-  };
-
-  const { refreshPayments, payments } = usePayments()
-
-  const paymentsQuery = useQuery<{ data: Payment[]; total: number }, Error>({
-    queryKey: ["payments", currentPage, pageSize, currentFilter, searchTerm],
-    queryFn: () => refreshPayments(currentPage, pageSize, currentFilter, searchTerm),
-    placeholderData: (previousData) => previousData,
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [currentFilter, setCurrentFilter] = useState("ALL")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list")
+  const [paymentSummary, setPaymentSummary] = useState({
+    totalRecaudado: 0,
+    pagosPagados: 0,
+    pagosPendientes: 0,
+    pagosAtrasados: 0,
+    periodoUtilizado: 'thisMonth'
   })
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const paymentSummaryQuery = useQuery({
-    queryKey: ["paymentSummary"],
-    queryFn: fetchPaymentSummary,
-  })
+  const { 
+    refreshPayments, 
+    payments,
+    createPayment,
+    updatePayment,
+    deletePayment,
+    getPaymentSummary
+  } = usePayments()
 
-  React.useEffect(() => {
-    if (paymentsQuery.data) {
-      setTotalRecords(paymentsQuery.data.total)
+  // Cargar pagos
+  const loadPayments = async () => {
+    setIsLoading(true)
+    try {
+      const result = await refreshPayments(currentPage, pageSize, currentFilter, searchTerm)
+      setTotalRecords(result.total)
+    } catch (error) {
+      console.error('Error al cargar pagos:', error)
+      toast({
+        title: "Error al cargar pagos",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
-  }, [paymentsQuery.data])
-
-  const createPaymentFn = async (data: PaymentFormData) => {
-    const response = await api.post("/payments", data)
-    return response.data
   }
 
-  const updatePaymentFn = async ({ id, data }: { id: number; data: PaymentFormData }) => {
-    const response = await api.patch(`/payments/${id}`, data)
-    return response.data
+  // Cargar resumen de pagos
+  const loadPaymentSummary = async () => {
+    try {
+      const summary = await getPaymentSummary()
+      setPaymentSummary(summary)
+    } catch (error) {
+      console.error('Error al cargar resumen:', error)
+    }
   }
 
-  const deletePaymentFn = async (id: number) => {
-    const response = await api.delete(`/payments/${id}`)
-    return response.data
-  }
+  // Cargar datos al cambiar los filtros
+  useEffect(() => {
+    loadPayments()
+  }, [currentPage, pageSize, currentFilter, searchTerm])
 
-  const mutationOptions = {
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["payments", currentPage, pageSize, currentFilter] })
-      queryClient.invalidateQueries({ queryKey: ["paymentSummary"] })
-      setIsModalOpen(false)
-      setSelectedPayment(null)
-      toast({
-        title: `Pago ${selectedPayment ? "actualizado" : "creado"} correctamente`,
-      })
-    },
-    onError: (error: Error) => {
-      toast({
-        title: `Error al ${selectedPayment ? "actualizar" : "crear"} pago`,
-        description: error.message,
-        variant: "destructive",
-      })
-    },
-  }
-
-  const createMutation = useMutation<unknown, Error, PaymentFormData>({
-    mutationFn: createPaymentFn,
-    ...mutationOptions,
-  })
-
-  const updateMutation = useMutation<unknown, Error, { id: number; data: PaymentFormData }>({
-    mutationFn: updatePaymentFn,
-    ...mutationOptions,
-  })
-
-  const deleteMutation = useMutation<unknown, Error, number>({
-    mutationFn: deletePaymentFn,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["payments", currentPage, pageSize, currentFilter] })
-      queryClient.invalidateQueries({ queryKey: ["paymentSummary"] })
-      toast({
-        title: "Pago eliminado correctamente",
-      })
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error al eliminar pago",
-        description: error.message,
-        variant: "destructive",
-      })
-    },
-  })
+  // Cargar resumen al inicio
+  useEffect(() => {
+    loadPaymentSummary()
+  }, [])
 
   const handleAdd = () => {
     setSelectedPayment(null)
@@ -134,21 +103,52 @@ export default function PaymentPage() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = (paymentId: string) => {
+  const handleDelete = async (paymentId: string) => {
     const idAsNumber = Number.parseInt(paymentId, 10)
     if (isNaN(idAsNumber)) {
-      console.error("Invalid payment ID for deletion")
       toast({ title: "ID de pago inválido", variant: "destructive" })
       return
     }
-    deleteMutation.mutate(idAsNumber)
+    
+    setIsLoading(true)
+    try {
+      await deletePayment(idAsNumber)
+      toast({ title: "Pago eliminado correctamente" })
+      loadPayments()
+      loadPaymentSummary()
+    } catch (error) {
+      console.error('Error al eliminar pago:', error)
+      toast({
+        title: "Error al eliminar pago",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleSave = (values: PaymentFormData) => {
-    if (selectedPayment) {
-      updateMutation.mutate({ id: selectedPayment.id, data: values })
-    } else {
-      createMutation.mutate(values)
+  const handleSave = async (values: PaymentFormData) => {
+    setIsSubmitting(true)
+    try {
+      if (selectedPayment) {
+        await updatePayment(selectedPayment.id, values)
+        toast({ title: "Pago actualizado correctamente" })
+      } else {
+        await createPayment(values)
+        toast({ title: "Pago creado correctamente" })
+      }
+      setIsModalOpen(false)
+      setSelectedPayment(null)
+      loadPayments()
+      loadPaymentSummary()
+    } catch (error) {
+      console.error('Error al guardar pago:', error)
+      toast({
+        title: `Error al ${selectedPayment ? "actualizar" : "crear"} pago`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -158,8 +158,8 @@ export default function PaymentPage() {
   }
 
   const handleReload = () => {
-    paymentsQuery.refetch()
-    paymentSummaryQuery.refetch()
+    loadPayments()
+    loadPaymentSummary()
   }
 
   const handleFilterChange = (filter: string) => {
@@ -169,8 +169,7 @@ export default function PaymentPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    // Implement search functionality
-    // This would typically update a state variable that's used in the query
+    loadPayments()
   }
 
   const paymentColumns = React.useMemo((): ColumnDef<Payment>[] => {
@@ -190,27 +189,29 @@ export default function PaymentPage() {
     ]
   }, [handleDelete, handleEdit])
 
-  const isLoadingMutation = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
-  const isFetchingOrMutating = paymentsQuery.isFetching || paymentSummaryQuery.isFetching || isLoadingMutation
-
   return (
     <MainContainer>
       <HeaderActions title="Registro de Pagos">
-        <ReloadButton onClick={handleReload} isLoading={isFetchingOrMutating} />
+        <ReloadButton onClick={handleReload} isLoading={isLoading} />
         <AddButton onClick={handleAdd} text="Nuevo Pago" />
       </HeaderActions>
 
       {/* Summary Cards */}
       <PaymentSummaryCards
-        summary={paymentSummaryQuery.data || { totalCollected: 0, paidCount: 0, pendingCount: 0, lateCount: 0 }}
-        isLoading={paymentSummaryQuery.isLoading}
+        summary={{
+          totalCollected: paymentSummary.totalRecaudado,
+          paidCount: paymentSummary.pagosPagados,
+          pendingCount: paymentSummary.pagosPendientes,
+          lateCount: paymentSummary.pagosAtrasados
+        }}
+        isLoading={isLoading}
       />
 
       {/* Filter Tabs */}
       <PaymentFilterTabs
         currentFilter={currentFilter}
         onFilterChange={handleFilterChange}
-        isLoading={isFetchingOrMutating}
+        isLoading={isLoading}
       />
 
       {/* Search and View Controls */}
@@ -260,32 +261,53 @@ export default function PaymentPage() {
         </div>
       </div>
 
-      <ResponsiveTable<Payment>
-        data={paymentsQuery.data?.data ?? []}
-        columns={paymentColumns}
-        renderCard={(payment) => <PaymentCard payment={payment} onEdit={handleEdit} onDelete={handleDelete} />}
-        isLoading={isFetchingOrMutating}
-        onPaginationChange={handlePaginationChange}
-        totalRecords={totalRecords}
-        pageSize={pageSize}
-        currentPage={currentPage}
-      />
-
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen} modal={false}>
-        <DialogContent
-          className="sm:max-w-2xl"
-          onInteractOutside={(e) => {
-            // Previene que el diálogo se cierre al hacer clic dentro de un Select o Popover
-            e.preventDefault()
+      {/* Content */}
+      {viewMode === "list" ? (
+        <ResponsiveTable
+          headers={headers}
+          columns={paymentColumns}
+          data={payments}
+          isLoading={isLoading}
+          pagination={{
+            currentPage,
+            pageSize,
+            totalRecords,
+            onPaginationChange: handlePaginationChange,
           }}
-        >
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {isLoading ? (
+            Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="h-64 rounded-lg bg-muted animate-pulse" />
+            ))
+          ) : payments.length > 0 ? (
+            payments.map((payment) => (
+              <PaymentCard
+                key={payment.id}
+                payment={payment}
+                onEdit={() => handleEdit(payment)}
+                onDelete={() => handleDelete(payment.id.toString())}
+              />
+            ))
+          ) : (
+            <div className="col-span-full flex flex-col items-center justify-center py-12">
+              <p className="text-muted-foreground">No se encontraron pagos con los filtros seleccionados.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Payment Form Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedPayment ? "Editar Pago" : "Nuevo Pago"}</DialogTitle>
+            <DialogTitle>{selectedPayment ? "Editar" : "Crear"} Pago</DialogTitle>
           </DialogHeader>
           <PaymentForm
             payment={selectedPayment}
             onSubmit={handleSave}
-            isLoading={isLoadingMutation}
+            isLoading={isSubmitting}
             onCancel={() => setIsModalOpen(false)}
           />
         </DialogContent>

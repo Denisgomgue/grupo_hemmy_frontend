@@ -107,9 +107,12 @@ export default function PlanPage() {
                     headers={headers}
                     data={paginatedData}
                     isLoading={isLoading}
-                    totalRecords={plans.length}
-                    pageSize={pageSize}
-                    onPaginationChange={handlePaginationChange}
+                    pagination={{
+                        totalRecords: plans.length,
+                        pageSize: pageSize,
+                        onPaginationChange: handlePaginationChange,
+                        currentPage: currentPage
+                    }}
                     actions={(row: Plan) => <ActionsCell rowData={row} />}
                 />
 

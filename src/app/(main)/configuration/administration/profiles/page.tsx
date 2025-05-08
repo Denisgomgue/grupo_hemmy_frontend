@@ -111,9 +111,11 @@ const ProfilePage: React.FC = () => {
                     headers={headers}
                     data={paginatedData}
                     isLoading={isLoading}
-                    totalRecords={profiles.length}
-                    pageSize={pageSize}
-                    onPaginationChange={handlePaginationChange}
+                    pagination={{
+                        totalRecords: profiles.length,
+                        pageSize: pageSize,
+                        onPaginationChange: handlePaginationChange
+                    }}
                     actions={(row: Profile) => <ActionsCell rowData={row} />}
                 />
                 {dialogOpen && (

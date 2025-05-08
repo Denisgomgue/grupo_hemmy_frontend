@@ -107,9 +107,12 @@ export default function SectorPage() {
                     headers={headers}
                     data={paginatedData}
                     isLoading={isLoading}
-                    totalRecords={sectors.length}
-                    pageSize={pageSize}
-                    onPaginationChange={handlePaginationChange}
+                    pagination={{
+                        totalRecords: sectors.length,
+                        pageSize: pageSize,
+                        onPaginationChange: handlePaginationChange,
+                        currentPage: currentPage
+                    }}
                     actions={(row: Sector) => <ActionsCell rowData={row} />}
                 />
 

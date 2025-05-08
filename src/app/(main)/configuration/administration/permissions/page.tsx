@@ -105,9 +105,12 @@ const PermisosPage: React.FC = () => {
                     headers={headers}
                     data={paginatedData}
                     isLoading={isLoading}
-                    totalRecords={permissions.length}
-                    pageSize={pageSize}
-                    onPaginationChange={handlePaginationChange}
+                    pagination={{
+                        totalRecords: permissions.length,
+                        pageSize: pageSize,
+                        onPaginationChange: handlePaginationChange,
+                        currentPage: currentPage
+                    }}
                     actions={(row: Permission) => <ActionsCell rowData={row} />}
                 />
                 {dialogOpen && (

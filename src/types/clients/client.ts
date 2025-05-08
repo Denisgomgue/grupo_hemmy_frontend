@@ -7,6 +7,13 @@ export enum AccountStatus {
     INACTIVE = 'INACTIVE'
 }
 
+export enum PaymentStatus {
+    SUSPENDED = 'SUSPENDED',
+    EXPIRING = 'EXPIRING',
+    EXPIRED = 'EXPIRED',
+    PAID = 'PAID'
+}
+
 export interface Client {
     id: number;
     name: string;
@@ -22,4 +29,7 @@ export interface Client {
     description: string;    
     plan: Plan;
     sector: Sector;
+    paymentStatus: PaymentStatus;
+    decoSerial?: string;
+    routerSerial?: string;
 }

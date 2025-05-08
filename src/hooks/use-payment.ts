@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react"
 import api from "@/lib/axios"
-import { Plan } from "@/types/plans/plan"
 import { Payment } from "@/types/payments/payment"
 
 let paymentList: Payment[] = []
+let totalRecords = 0
 let listeners: Array<() => void> = []
 
 const notifyListeners = () => {
@@ -28,12 +28,101 @@ export function usePayments() {
             const response = await api.get<Payment[]>("/payments", {
                 params
             })
-            paymentList = response.data 
+            
+            // Asumiendo que la respuesta del backend tiene un formato { data: Payment[], total: number }
+            // Si el backend devuelve directamente un array, ajusta esto
+            if (Array.isArray(response.data)) {
+                paymentList = response.data
+                totalRecords = response.data.length
+            } else if (response.data && typeof response.data === 'object') {
+                const data = response.data as any
+                if ('data' in data && 'total' in data) {
+                    paymentList = data.data
+                    totalRecords = data.total
+                } else {
+                    paymentList = response.data as unknown as Payment[]
+                    totalRecords = paymentList.length
+                }
+            } else {
+                paymentList = response.data as unknown as Payment[]
+                totalRecords = paymentList.length
+            }
+            
             notifyListeners()
-            return { data: paymentList, total: paymentList.length }
+            return { data: paymentList, total: totalRecords }
         } catch (error) {
             console.error("Error fetching payments:", error)
             return { data: [], total: 0 }
+        }
+    }, [])
+
+    const createPayment = useCallback(async (paymentData: any) => {
+        try {
+            // Asegurar que discount sea siempre un número
+            const sanitizedData = {
+                ...paymentData,
+                discount: typeof paymentData.discount === 'number' ? 
+                          paymentData.discount : 
+                          paymentData.discount === "" || paymentData.discount === null || paymentData.discount === undefined ? 
+                          0 : 
+                          Number(paymentData.discount)
+            };
+            
+            const response = await api.post("/payments", sanitizedData)
+            await refreshPayments()
+            return response.data
+        } catch (error) {
+            console.error("Error creating payment:", error)
+            throw error
+        }
+    }, [refreshPayments])
+
+    const updatePayment = useCallback(async (id: number, paymentData: any) => {
+        try {
+            // Asegurar que discount sea siempre un número
+            const sanitizedData = {
+                ...paymentData,
+                discount: typeof paymentData.discount === 'number' ? 
+                          paymentData.discount : 
+                          paymentData.discount === "" || paymentData.discount === null || paymentData.discount === undefined ? 
+                          0 : 
+                          Number(paymentData.discount)
+            };
+            
+            const response = await api.patch(`/payments/${id}`, sanitizedData)
+            await refreshPayments()
+            return response.data
+        } catch (error) {
+            console.error("Error updating payment:", error)
+            throw error
+        }
+    }, [refreshPayments])
+
+    const deletePayment = useCallback(async (id: number) => {
+        try {
+            const response = await api.delete(`/payments/${id}`)
+            await refreshPayments()
+            return response.data
+        } catch (error) {
+            console.error("Error deleting payment:", error)
+            throw error
+        }
+    }, [refreshPayments])
+
+    const getPaymentSummary = useCallback(async (period: string = 'thisMonth') => {
+        try {
+            const response = await api.get("/payments/summary", {
+                params: { period }
+            })
+            return response.data
+        } catch (error) {
+            console.error("Error fetching payment summary:", error)
+            return {
+                totalRecaudado: 0,
+                pagosPagados: 0,
+                pagosPendientes: 0,
+                pagosAtrasados: 0
+            }
         }
     }, [])
 
@@ -46,5 +135,12 @@ export function usePayments() {
         }
     }, [])
 
-    return { payments, refreshPayments }
+    return { 
+        payments, 
+        refreshPayments, 
+        createPayment, 
+        updatePayment, 
+        deletePayment,
+        getPaymentSummary
+    }
 }

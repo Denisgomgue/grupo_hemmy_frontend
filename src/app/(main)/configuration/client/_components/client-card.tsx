@@ -1,6 +1,6 @@
 "use client";
 
-import { Client, AccountStatus } from "@/types/clients/client";
+import { Client, AccountStatus, PaymentStatus } from "@/types/clients/client";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
@@ -17,6 +17,21 @@ const getAccountStatusVariant = (status: AccountStatus): "success" | "secondary"
         case AccountStatus.SUSPENDED: return "secondary";
         case AccountStatus.INACTIVE: return "destructive";
         default: return "outline";
+    }
+}
+
+const getPaymentStatusVariant = (status: PaymentStatus): "success" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+        case PaymentStatus.PAID:
+            return "success";
+        case PaymentStatus.EXPIRING:
+            return "secondary";
+        case PaymentStatus.SUSPENDED:
+            return "destructive";
+        case PaymentStatus.EXPIRED:
+            return "destructive";
+        default:
+            return "outline";
     }
 }
 
@@ -58,6 +73,7 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
     const initial = client.name ? client.name[0].toUpperCase() : "?";
     const paymentInfo = getPaymentStatus(client.paymentDate);
     const paymentBadgeVariant = paymentInfo.variant === 'warning' ? 'secondary' : paymentInfo.variant;
+    const clientOwnPaymentStatus = client.paymentStatus;
 
     // Definir el contenido de cada sección
     const topSectionContent = (
@@ -90,15 +106,18 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
                 </div>
                 <div className="text-xs text-muted-foreground">{client.plan?.speed ?? 'N/A'} Mbps</div>
             </div>
-                <div>
+            <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Próximo Pago</div>
                 <div className="font-medium">{client.paymentDate ? format(new Date(client.paymentDate), 'P', { locale: es }) : 'N/A'}</div>
             </div>
-                <div>
+            <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Estado Cuenta / Pago</div>
-                    <div className="flex flex-col items-start gap-1">
+                <div className="flex flex-col items-start gap-1">
                     <Badge variant={getAccountStatusVariant(client.status)}>{client.status}</Badge>
                     <Badge variant={paymentBadgeVariant}>{paymentInfo.text}</Badge>
+                    {clientOwnPaymentStatus && (
+                        <Badge variant={getPaymentStatusVariant(clientOwnPaymentStatus)}>{clientOwnPaymentStatus}</Badge>
+                    )}
                 </div>
             </div>
         </div>

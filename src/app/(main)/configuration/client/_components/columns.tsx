@@ -1,13 +1,14 @@
 "use client"
 
 import type { ColumnDef } from "@tanstack/react-table"
-import { Client, AccountStatus } from "@/types/clients/client"
+import { Client, AccountStatus, PaymentStatus } from "@/types/clients/client"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox" // Para la columna de selección
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar" // Para la columna cliente
 import { Check, X, Wifi, Zap, Settings, HelpCircle } from "lucide-react" // Iconos
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
+import Link from "next/link"
 
 // Helper para variant del Badge de estado de CUENTA (Activo, Suspendido, etc.)
 const getAccountStatusVariant = (status: AccountStatus): "success" | "secondary" | "destructive" | "outline" => {
@@ -17,6 +18,22 @@ const getAccountStatusVariant = (status: AccountStatus): "success" | "secondary"
         case AccountStatus.SUSPENDED:
             return "secondary";
         case AccountStatus.INACTIVE:
+            return "destructive";
+        default:
+            return "outline";
+    }
+}
+
+// Helper para variant del Badge de estado de PAGO (Al día, Por vencer, En mora)
+const getPaymentStatusVariant = (status: PaymentStatus): "success" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+        case PaymentStatus.PAID:
+            return "success";
+        case PaymentStatus.EXPIRING:
+            return "secondary";
+        case PaymentStatus.SUSPENDED:
+            return "destructive";
+        case PaymentStatus.EXPIRED:
             return "destructive";
         default:
             return "outline";
@@ -84,6 +101,7 @@ export const baseColumns: ColumnDef<Client>[] = [
         cell: ({ row }) => {
             const client = row.original;
             const initial = client.name ? client.name[0].toUpperCase() + client.lastName[0].toUpperCase() : "?";
+            
             return (
                 <div className="flex items-center gap-3">
                     <Avatar className="h-8 w-8 text-xs">
@@ -91,7 +109,12 @@ export const baseColumns: ColumnDef<Client>[] = [
                         <AvatarFallback>{initial}</AvatarFallback>
                     </Avatar>
                     <div>
-                        <div className="font-medium">{client.name} {client.lastName}</div>
+                        <Link 
+                            href={`/configuration/client/${client.id}`}
+                            className="font-medium hover:text-primary hover:underline"
+                        >
+                            {client.name} {client.lastName}
+                        </Link>
                         <div className="text-xs text-muted-foreground">Sector: {client.sector?.name || 'N/A'}</div>
                     </div>
                 </div>
@@ -152,12 +175,14 @@ export const baseColumns: ColumnDef<Client>[] = [
         cell: ({ row }) => {
             const accountStatus = row.original.status;
             const paymentInfo = getPaymentStatus(row.original.paymentDate);
+            const paymentStatus = row.original.paymentStatus;
              // Corregir variant de pago si es warning
             const paymentVariant = paymentInfo.variant === 'warning' ? 'secondary' : paymentInfo.variant;
             return (
                 <div className="flex flex-col items-start gap-1">
                     <Badge variant={getAccountStatusVariant(accountStatus)}>{accountStatus}</Badge>
                     <Badge variant={paymentVariant}>{paymentInfo.text}</Badge> 
+                    <Badge variant={getPaymentStatusVariant(paymentStatus)}>{paymentStatus}</Badge>
                 </div>
             )
         }

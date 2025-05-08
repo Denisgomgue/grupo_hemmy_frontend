@@ -29,6 +29,16 @@ export function useClient() {
         }
     }, [])
 
+    const getClientById = useCallback(async (id: string | number): Promise<Client> => {
+        try {
+            const response = await api.get<Client>(`/client/${id}`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error fetching client with ID ${id}:`, error);
+            throw error;
+        }
+    }, []);
+
     useEffect(() => {
         const listener = () => setClient([...clientList])
         listeners.push(listener)
@@ -38,5 +48,5 @@ export function useClient() {
         }
     }, [])
 
-    return { client, refreshClient }
+    return { client, refreshClient, getClientById }
 }

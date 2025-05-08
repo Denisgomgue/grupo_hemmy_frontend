@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 export const AccountStatusEnum = z.enum(['ACTIVE', 'SUSPENDED', 'INACTIVE']);
+export const PaymentStatusEnum = z.enum(['SUSPENDED', 'EXPIRING', 'EXPIRED', 'PAID']);
+
 
 
 export const ClientSchema = z.object({
@@ -19,6 +21,9 @@ export const ClientSchema = z.object({
     plan: z.number({ required_error: "* Plan es requerido" }),
     sector: z.number({ required_error: "* Sector es requerido" }),
     description: z.string().optional(),
+    paymentStatus: PaymentStatusEnum.optional(),
+    decoSerial: z.string().optional(),
+    routerSerial: z.string().optional(),
 });
 
 export type ClientFormData = z.infer<typeof ClientSchema>;

@@ -173,14 +173,17 @@ export default function ClientPage() {
             <ResponsiveTable<Client>
                 data={clientsQuery.data?.data ?? []}
                 columns={clientColumns}
+                headers={[]}
                 renderCard={(client) => (
                     <ClientCard client={client} onEdit={handleEdit} />
                 )}
                 isLoading={isFetchingOrMutating}
-                onPaginationChange={handlePaginationChange}
-                totalRecords={totalRecords}
-                pageSize={pageSize}
-                currentPage={currentPage}
+                pagination={{
+                    onPaginationChange: handlePaginationChange,
+                    totalRecords: totalRecords,
+                    pageSize: pageSize,
+                    currentPage: currentPage
+                }}
             />
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen} modal={false}>

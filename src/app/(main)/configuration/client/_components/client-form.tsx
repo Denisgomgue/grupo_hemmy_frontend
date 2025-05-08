@@ -35,15 +35,14 @@ export interface ClientFormProps {
 }
 
 export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientFormProps) {
-    const [ isMounted, setIsMounted ] = useState(false)
-    const [ step, setStep ] = useState(1)
+    const [isMounted, setIsMounted] = useState(false)
+    const [step, setStep] = useState(1)
 
     const { plans, refreshPlans } = usePlans()
     const { sectors, refreshSector } = useSectors()
     const { services, refreshService } = useServices()
-    const [ loading, setLoading ] = useState(false)
 
-    const [ selectedServiceId, setSelectedServiceId ] = useState<number | undefined>(
+    const [selectedServiceId, setSelectedServiceId] = useState<number | undefined>(
         client?.plan?.service?.id
     )
 
@@ -64,6 +63,9 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
             plan: client.plan?.id ?? undefined,
             sector: client.sector?.id ?? undefined,
             description: client.description ?? '',
+            paymentStatus: client.paymentStatus,
+            decoSerial: client.decoSerial ?? '',
+            routerSerial: client.routerSerial ?? '',
         } : {
             id: undefined,
             name: '',
@@ -79,6 +81,9 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
             plan: undefined,
             sector: undefined,
             description: '',
+            paymentStatus: undefined,
+            decoSerial: '',
+            routerSerial: '',
         },
     })
 
@@ -106,6 +111,9 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                 plan: client.plan?.id ?? undefined,
                 sector: client.sector?.id ?? undefined,
                 description: client.description ?? '',
+                paymentStatus: client.paymentStatus,
+                decoSerial: client.decoSerial ?? '',
+                routerSerial: client.routerSerial ?? '',
             })
             setSelectedServiceId(client.plan?.service?.id)
         } else {
@@ -124,15 +132,18 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                 plan: undefined,
                 sector: undefined,
                 description: '',
+                paymentStatus: undefined,
+                decoSerial: '',
+                routerSerial: '',
             })
         }
         setStep(1)
-    }, [ client ])
+    }, [client])
 
     const filteredPlans = React.useMemo(() => {
         if (!selectedServiceId) return [];
         return plans.filter(plan => plan.service?.id === selectedServiceId);
-    }, [ plans, selectedServiceId ]);
+    }, [plans, selectedServiceId]);
 
     if (!isMounted) {
         return null
@@ -142,12 +153,11 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
     const prevStep = () => setStep((prev) => prev - 1)
 
     const _onSubmit = (values: ClientFormData) => {
-        setLoading(true)
+        console.log("ClientForm _onSubmit called with values:", values);
         try {
-            onSubmit(values)
+            onSubmit(values);
         } catch (error) {
-            console.error("Error submitting form:", error)
-        } finally {
+            console.error("Synchronous error in ClientForm _onSubmit wrapper:", error);
         }
     }
 
@@ -216,6 +226,7 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                                     ))}
                                 </SelectContent>
                             </Select>
+                            <FormMessage />
                         </FormItem>
                         <FormField control={form.control} name="plan" render={({ field }) => (
                             <FormItem>
@@ -252,32 +263,39 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                                 <FormMessage />
                             </FormItem>
                         )} />
-                        <FormField control={form.control} name="installationDate" render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                                <FormLabel>Fecha Instalación</FormLabel>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <FormControl>
-                                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                {field.value ? format(new Date(field.value), "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                            </Button>
-                                        </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={field.value ? new Date(`${field.value}T00:00:00`) : undefined}
-                                            onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
-                                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                            initialFocus
-                                            locale={es}
-                                        />
-                                    </PopoverContent>
-                                </Popover>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
+                        <FormField
+                            control={form.control}
+                            name="installationDate"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Fecha Instalación</FormLabel>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <FormControl>
+                                                <Button
+                                                    variant={"outline"}
+                                                    className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                                                >
+                                                    {field.value ? format(new Date(`${field.value}T00:00:00`), "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                </Button>
+                                            </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                selected={field.value ? new Date(`${field.value}T00:00:00`) : undefined}
+                                                onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
+                                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                initialFocus
+                                                locale={es}
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         <FormField control={form.control} name="paymentDate" render={({ field }) => (
                             <FormItem className="flex flex-col">
                                 <FormLabel>Fecha Próximo Pago</FormLabel>
@@ -322,6 +340,20 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                                 <div className="space-y-1 leading-none">
                                     <FormLabel>Pago Adelantado</FormLabel>
                                 </div>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="decoSerial" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Serie Decodificador</FormLabel>
+                                <FormControl><Input {...field} placeholder="Serie del Deco (Opcional)" /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="routerSerial" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Serie Router</FormLabel>
+                                <FormControl><Input {...field} placeholder="Serie del Router (Opcional)" /></FormControl>
                                 <FormMessage />
                             </FormItem>
                         )} />

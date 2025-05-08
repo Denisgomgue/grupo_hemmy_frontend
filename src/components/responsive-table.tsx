@@ -17,14 +17,18 @@ import {
 // Definir interfaz genérica para props
 interface ResponsiveTableProps<T> {
     data: T[];
-    columns: ColumnDef<T>[]; // Columnas para la tabla de escritorio
-    renderCard: (item: T) => React.ReactNode; // Función para renderizar la tarjeta en móvil
+    columns: ColumnDef<T, any>[]; 
+    headers: any[]; 
+    renderCard?: (item: T) => React.ReactNode; 
     isLoading?: boolean;
     // Props de paginación
-    onPaginationChange?: (page: number, pageSize: number) => void;
-    totalRecords?: number;
-    pageSize?: number;
-    currentPage?: number;
+    pagination?: {
+        onPaginationChange?: (page: number, pageSize: number) => void;
+        totalRecords?: number;
+        pageSize?: number;
+        currentPage?: number;
+    };
+    error?: any;
     // Opcional: Prop para pasar acciones a las tarjetas si es necesario
     // cardActions?: { [key: string]: (item: T) => void };
 }
@@ -32,12 +36,11 @@ interface ResponsiveTableProps<T> {
 export function ResponsiveTable<T>({
     data,
     columns,
+    headers,
     renderCard,
     isLoading = false,
-    onPaginationChange,
-    totalRecords = 0,
-    pageSize = 10,
-    currentPage = 1,
+    pagination,
+    error,
     // cardActions
 }: ResponsiveTableProps<T>) {
     const isMobile = useIsMobile();
@@ -61,7 +64,7 @@ export function ResponsiveTable<T>({
                 <div className="grid grid-cols-1 gap-4">
                     {isLoading && (
                         // Esqueleto genérico para tarjetas
-                        Array.from({ length: pageSize }).map((_, index) => (
+                        Array.from({ length: pagination?.pageSize || 10 }).map((_, index) => (
                             <div key={index} className="p-4 border rounded-lg shadow-sm h-60 animate-pulse bg-muted"></div>
                         ))
                     )}
@@ -70,11 +73,16 @@ export function ResponsiveTable<T>({
                             No hay elementos para mostrar.
                         </p>
                     )}
-                    {/* Mapear sobre data y llamar a renderCard */} 
-                    {!isLoading && data.map((item, index) => (
+                    {/* Mapear sobre data y llamar a renderCard si está disponible, o mostrar una tarjeta predeterminada */ 
+                    !isLoading && data.map((item, index) => (
                          // Usar un key estable, idealmente item.id si existe y es único
                         <React.Fragment key={(item as any).id ?? index}>
-                           {renderCard(item)}
+                           {renderCard ? renderCard(item) : (
+                             <div className="p-4 border rounded-lg">
+                               {/* Renderizado predeterminado de tarjeta */}
+                               <p>Elemento {index+1}</p>
+                             </div>
+                           )}
                         </React.Fragment>
                     ))}
                     {/* TODO: Añadir controles de paginación móvil genéricos si es necesario */} 
@@ -82,27 +90,16 @@ export function ResponsiveTable<T>({
             ) : (
                  // --- Vista Escritorio: Renderizar GeneralTable --- 
                  // Pasar columnas y datos genéricos
-                 // Asumiendo que GeneralTable espera <TData, TValue>
-                 // Pasamos unknown como TValue por ahora, ajustar si se conoce el tipo
-                <GeneralTable<T, unknown> 
+                <GeneralTable
                     columns={columns} 
                     data={data}
                     isLoading={isLoading}
-                    // Pasar props de paginación y estado si GeneralTable las necesita
-                    onPaginationChange={onPaginationChange}
-                    totalRecords={totalRecords}
-                    pageSize={pageSize}
-                    // currentPage={currentPage} // Pasar si GeneralTable la controla
-                    // Pasar estados de tabla si GeneralTable los necesita externamente
-                    // sorting={sorting}
-                    // setSorting={setSorting}
-                    // ...etc
+                    error={error}
+                    // Pasar props de paginación
+                    onPaginationChange={pagination?.onPaginationChange}
+                    totalRecords={pagination?.totalRecords}
+                    pageSize={pagination?.pageSize}
                 />
-                 /* Paginación genérica para la tabla si no está incluida 
-                 <div className="py-4">
-                     <DataTablePagination table={table} /> // Necesitaría instancia 'table'
-                 </div>
-                 */ 
             )}
         </div>
     );

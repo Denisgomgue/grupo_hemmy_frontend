@@ -28,6 +28,7 @@ interface GeneralTableProps<TData, TValue> {
     onPaginationChange?: (page: number, pageSize: number) => void
     totalRecords?: number
     pageSize?: number
+    currentPage?: number
 }
 
 export function GeneralTable<TData, TValue>({
@@ -39,10 +40,11 @@ export function GeneralTable<TData, TValue>({
     onPaginationChange,
     totalRecords,
     pageSize: initialPageSize = 10,
+    currentPage = 1
 }: GeneralTableProps<TData, TValue>) {
     const [pageSize, setPageSize] = useState(initialPageSize)
-    const [pageIndex, setPageIndex] = useState(0)
-    const [goToPage, setGoToPage] = useState("1")
+    const [pageIndex, setPageIndex] = useState(currentPage - 1)
+    const [goToPage, setGoToPage] = useState(currentPage.toString())
 
     const table = useReactTable({
         data,
@@ -71,6 +73,11 @@ export function GeneralTable<TData, TValue>({
     useEffect(() => {
         table.setPageSize(initialPageSize)
     }, [initialPageSize, table])
+
+    useEffect(() => {
+        setPageIndex(currentPage - 1)
+        setGoToPage(currentPage.toString())
+    }, [currentPage])
 
     const handleGoToPage = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter") {

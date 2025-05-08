@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { CalendarIcon } from "lucide-react"
+import { useState, useEffect } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -28,23 +29,28 @@ interface PaymentFormProps {
 }
 
 export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: PaymentFormProps) {
+  const [autoCalculateState, setAutoCalculateState] = useState(true)
+  
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(PaymentSchema),
     defaultValues: {
       client: payment?.client.id || undefined,
-      amount: payment?.amount ?? null,
+      amount: payment?.amount ?? 0,
       paymentDate: payment?.paymentDate || format(new Date(), "yyyy-MM-dd"),
       paymentType: payment?.paymentType || PaymentTypeEnum.Enum.TRANSFER,
       state: payment?.state || PaymentStatusEnum.Enum.PENDING,
       reference: payment?.reference || "",
       transfername: payment?.transfername || "",
       reconnection: payment?.reconnection || false,
-      discount: payment?.discount ?? null,
-      dueDate: payment?.dueDate || undefined,
+      discount: payment?.discount ?? 0,
+      dueDate: payment?.dueDate || format(new Date(), "yyyy-MM-dd")
     },
   })
 
   const watchedPaymentType = form.watch("paymentType")
+  const watchedPaymentDate = form.watch("paymentDate")
+  const watchedDueDate = form.watch("dueDate")
+  const watchedClient = form.watch("client")
 
   const { data: clientsData, isLoading: isLoadingClients } = useQuery({
     queryKey: ["clients-minimal"],
@@ -55,9 +61,101 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
   })
   const clients = clientsData?.data || []
 
+  // Actualizar fecha de vencimiento cuando se selecciona un cliente
+  useEffect(() => {
+    if (watchedClient && clients.length > 0) {
+      const selectedClient = clients.find(client => client.id === watchedClient);
+      if (selectedClient && selectedClient.paymentDate) {
+        // Usar la fecha de pago del cliente como fecha de vencimiento
+        form.setValue("dueDate", format(new Date(selectedClient.paymentDate), "yyyy-MM-dd"));
+      }
+    }
+  }, [watchedClient, clients, form]);
+
+  // Limpiar transfername cuando se cambia a un método de pago que no lo requiere
+  useEffect(() => {
+    const requiresTransferName = 
+      watchedPaymentType === PaymentTypeEnum.Enum.TRANSFER || 
+      watchedPaymentType === PaymentTypeEnum.Enum.YAPE || 
+      watchedPaymentType === PaymentTypeEnum.Enum.PLIN;
+    
+    if (!requiresTransferName) {
+      form.setValue('transfername', '');
+      form.clearErrors('transfername');
+    }
+  }, [watchedPaymentType, form]);
+
+  // Calcular automáticamente el estado del pago
+  useEffect(() => {
+    if (!autoCalculateState) return;
+    
+    const calculatePaymentState = () => {
+      const dueDate = watchedDueDate ? new Date(watchedDueDate) : null;
+      const paymentDate = watchedPaymentDate ? new Date(watchedPaymentDate) : null;
+      const today = new Date();
+      
+      // Si no hay fecha de vencimiento, mantener como pendiente
+      if (!dueDate) {
+        form.setValue("state", PaymentStatusEnum.Enum.PENDING);
+        return;
+      }
+      
+      // Si hay fecha de pago
+      if (paymentDate) {
+        if (paymentDate > dueDate) {
+          form.setValue("state", PaymentStatusEnum.Enum.LATE_PAYMENT);
+        } else {
+          form.setValue("state", PaymentStatusEnum.Enum.PAYMENT_DAILY);
+        }
+      } 
+      // Si no hay fecha de pago
+      else {
+        if (today > dueDate) {
+          form.setValue("state", PaymentStatusEnum.Enum.LATE_PAYMENT);
+        } else {
+          form.setValue("state", PaymentStatusEnum.Enum.PENDING);
+        }
+      }
+    };
+    
+    calculatePaymentState();
+  }, [watchedPaymentDate, watchedDueDate, form, autoCalculateState]);
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        // Asegurarse de que el descuento sea siempre un número
+        const values = form.getValues();
+        const discountValue = values.discount;
+        
+        // Verificar si el descuento es nulo, indefinido, o no es un número válido
+        if (discountValue === null || discountValue === undefined || 
+            (typeof discountValue === 'string' && (discountValue === '' || isNaN(Number(discountValue)))) ||
+            (typeof discountValue === 'number' && isNaN(discountValue))) {
+          form.setValue('discount', 0);
+        } else if (typeof discountValue === 'string') {
+          // Convertir string a número
+          form.setValue('discount', Number(discountValue));
+        }
+        
+        // Verificar que el campo transfername tenga valor cuando es obligatorio
+        const paymentType = values.paymentType;
+        const needsTransferName = paymentType === PaymentTypeEnum.Enum.TRANSFER || 
+                                 paymentType === PaymentTypeEnum.Enum.YAPE || 
+                                 paymentType === PaymentTypeEnum.Enum.PLIN;
+        
+        if (needsTransferName && (!values.transfername || values.transfername.trim() === '')) {
+          form.setError('transfername', { 
+            type: 'manual', 
+            message: 'El nombre/referencia es obligatorio para este método de pago' 
+          });
+          return; // Detener el envío si falta el nombre de transferencia
+        }
+        
+        // Continuar con el envío normal del formulario
+        form.handleSubmit(onSubmit)(e);
+      }} className="space-y-6">
         {/* Row 1: Client and Amount */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
@@ -106,7 +204,7 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
                       value={field.value === null || field.value === undefined ? "" : String(field.value)}
                       onChange={(e) => {
                         const value = e.target.value
-                        field.onChange(value === "" ? null : parseFloat(value))
+                        field.onChange(value === "" ? 0 : parseFloat(value))
                       }}
                       disabled={isLoading}
                     />
@@ -188,7 +286,10 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
             name="transfername"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Nombre/Referencia de {watchedPaymentType.charAt(0) + watchedPaymentType.slice(1).toLowerCase()}</FormLabel>
+                <FormLabel className="flex items-center">
+                  Nombre/Referencia de {watchedPaymentType.charAt(0) + watchedPaymentType.slice(1).toLowerCase()}
+                  <span className="text-red-500 ml-1">*</span>
+                </FormLabel>
                 <FormControl>
                   <Input
                     placeholder={
@@ -199,6 +300,7 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
                     {...field}
                     value={field.value || ""}
                     disabled={isLoading}
+                    required
                   />
                 </FormControl>
                 <FormMessage />
@@ -263,10 +365,14 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
                       placeholder="0.00"
                       className="pl-10"
                       {...field}
-                      value={field.value === null || field.value === undefined ? "" : String(field.value)}
+                      value={field.value === 0 || field.value === null || field.value === undefined ? "0" : String(field.value)}
                       onChange={(e) => {
-                        const value = e.target.value
-                        field.onChange(value === "" ? null : parseFloat(value))
+                        const value = e.target.value;
+                        if (value === "" || isNaN(parseFloat(value))) {
+                          field.onChange(0);
+                        } else {
+                          field.onChange(parseFloat(value));
+                        }
                       }}
                       disabled={isLoading}
                     />
@@ -281,34 +387,41 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
             name="dueDate"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Fecha de Vencimiento (Opcional)</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
-                        disabled={isLoading}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {field.value ? format(new Date(field.value), "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={field.value ? new Date(field.value) : undefined}
-                      onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : undefined)}
-                      disabled={isLoading}
-                      initialFocus
+                <FormLabel>Fecha de Vencimiento (Automática)</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      className="bg-muted/50"
+                      value={field.value ? format(new Date(field.value), "dd/MM/yyyy") : "Sin fecha de vencimiento"}
+                      disabled={true}
+                      readOnly
                     />
-                  </PopoverContent>
-                </Popover>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <CalendarIcon className="h-4 w-4" />
+                    </div>
+                  </div>
+                </FormControl>
+                <FormDescription>
+                  Esta fecha se toma automáticamente del próximo pago programado del cliente.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
+        </div>
+
+        {/* Opción para cálculo automático del estado */}
+        <div className="flex items-center space-x-2">
+          <Switch 
+            id="auto-calculate-state" 
+            checked={autoCalculateState} 
+            onCheckedChange={setAutoCalculateState}
+            disabled={isLoading}
+          />
+          <label htmlFor="auto-calculate-state" className="text-sm cursor-pointer">
+            Calcular estado automáticamente basado en fechas
+          </label>
         </div>
 
         {/* Row 5: Reconnection */}

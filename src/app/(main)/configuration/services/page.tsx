@@ -106,9 +106,12 @@ export default function ServicePage() {
                     headers={headers}
                     data={paginatedData}
                     isLoading={isLoading}
-                    totalRecords={services.length}
-                    pageSize={pageSize}
-                    onPaginationChange={handlePaginationChange}
+                    pagination={{
+                        totalRecords: services.length,
+                        pageSize: pageSize,
+                        onPaginationChange: handlePaginationChange,
+                        currentPage: currentPage
+                    }}
                     actions={(row: Service) => <ActionsCell rowData={row} />}
                 />
 
