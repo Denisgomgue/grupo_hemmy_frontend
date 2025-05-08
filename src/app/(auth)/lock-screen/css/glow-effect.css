@@ -1,0 +1,51 @@
+@keyframes rotate {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 200% 50%;
+    }
+  }
+  
+  .glow-border {
+    position: relative;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 0.5rem;
+  }
+  
+  .glow-border::before {
+    content: "";
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(100deg, #52c3bd, var(--glow-color), #52c3bd, var(--glow-color));
+    background-size: 400% 400%;
+    border-radius: inherit;
+    z-index: -1;
+    animation: rotate 10s linear infinite;
+  }
+  
+  .glow-border::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: inherit;
+    border-radius: inherit;
+    z-index: -1;
+  }
+  
+  :root {
+    --glow-color: #fff;
+  }
+  
+  .dark {
+    --glow-color: #000;
+  }
+  
+  
