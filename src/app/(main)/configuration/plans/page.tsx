@@ -55,7 +55,6 @@ export default function PlanPage() {
     }
 
     const handleCreatePlan = async (planData: PlanFormData) => {
-        console.log(planData)
         setIsLoading(true)
         try {
             await api.post<PlanFormData>("/plans", planData)

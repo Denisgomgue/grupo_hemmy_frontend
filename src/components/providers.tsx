@@ -11,8 +11,12 @@ function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        // Configuración global opcional para queries
-        staleTime: 60 * 1000, // 1 minuto
+        // Configuración optimizada para producción
+        staleTime: process.env.NODE_ENV === 'production' ? 5 * 60 * 1000 : 60 * 1000, // 5 minutos en producción, 1 minuto en desarrollo
+        refetchOnWindowFocus: process.env.NODE_ENV === 'production' ? false : true,
+        retry: process.env.NODE_ENV === 'production' ? 2 : 1,
+        gcTime: process.env.NODE_ENV === 'production' ? 30 * 60 * 1000 : 10 * 60 * 1000, // 30 minutos en producción
+        retryDelay: attempt => Math.min(1000 * 2 ** attempt, 30000), // Backoff exponencial con máximo 30 segundos
       },
     },
   });
@@ -39,8 +43,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {/* Opcional: Añadir React Query DevTools para depuración */} 
-      <ReactQueryDevtools initialIsOpen={false} /> 
+      {/* DevTools solo visible en desarrollo */}
+      {process.env.NODE_ENV !== 'production' && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   );
 } 

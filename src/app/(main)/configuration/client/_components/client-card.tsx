@@ -8,6 +8,8 @@ import { es } from 'date-fns/locale';
 import { Wifi, Zap, Settings, HelpCircle } from "lucide-react";
 import { ClientActionsDropdown } from "./client-actions-dropdown";
 import { InfoCardShell } from "./info-card-shell";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 // --- Helpers (Movidos aquí desde headers.tsx) ---
 
@@ -64,9 +66,6 @@ interface ClientCardProps {
 }
 
 export function ClientCard({ client, onEdit }: ClientCardProps) {
-    console.log("ClientCard received client:", client);
-    console.log("ClientCard received onEdit prop type:", typeof onEdit);
-
     // Comprobación por si acaso, aunque headers.tsx ya no debería pasar undefined
     if (!client) return null;
 
@@ -138,11 +137,23 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
 
     // Renderizar usando el Shell
     return (
-        <InfoCardShell 
-            topSection={topSectionContent}
-            middleSection={middleSectionContent}
-            bottomSection={bottomSectionContent}
-        />
+        <Card className="w-full mb-4">
+            <CardHeader>
+                <CardTitle className="flex items-center">
+                    {client.name} {client.lastName}
+                </CardTitle>
+                <CardDescription>
+                    <StatusBadge status={client.paymentStatus} />
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <InfoCardShell 
+                    topSection={topSectionContent}
+                    middleSection={middleSectionContent}
+                    bottomSection={bottomSectionContent}
+                />
+            </CardContent>
+        </Card>
     );
 
 } 

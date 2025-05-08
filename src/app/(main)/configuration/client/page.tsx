@@ -111,7 +111,6 @@ export default function ClientPage() {
     };
 
     const handleEdit = (client: Client) => {
-        console.log("handleEdit llamado con:", client);
         setSelectedClient(client);
         setIsModalOpen(true);
     };
