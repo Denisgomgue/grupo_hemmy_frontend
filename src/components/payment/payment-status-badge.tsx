@@ -9,7 +9,7 @@ interface PaymentStatusBadgeProps {
 export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
   const getStatusConfig = (status: PaymentStatus) => {
     switch (status) {
-      case "PAID":
+      case "PAYMENT_DAILY":
         return {
           label: "Pagado",
           variant: "success" as const,
@@ -21,7 +21,7 @@ export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
           variant: "warning" as const,
           className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
         }
-      case "LATE":
+      case "LATE_PAYMENT":
         return {
           label: "Atrasado",
           variant: "destructive" as const,
@@ -39,7 +39,7 @@ export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
   const config = getStatusConfig(status)
 
   return (
-    <Badge variant={config.variant} className={cn("font-medium", config.className)}>
+    <Badge variant={config.variant as "success" | "destructive" | "outline" | "default" | "secondary" | "blue"} className={cn("font-medium", config.className)}>
       {config.label}
     </Badge>
   )

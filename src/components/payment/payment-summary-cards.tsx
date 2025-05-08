@@ -1,6 +1,12 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { DollarSign, CheckCircle, Clock, AlertTriangle } from "lucide-react"
-import type { PaymentSummary } from "@/types/payments/payment"
+
+export interface PaymentSummary {
+  totalCollected: number;
+  paidCount: number;
+  pendingCount: number;
+  lateCount: number;
+}
 
 interface PaymentSummaryCardsProps {
   summary: PaymentSummary
@@ -27,7 +33,7 @@ export function PaymentSummaryCards({ summary, isLoading = false }: PaymentSumma
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Total Recaudado</p>
-              <h3 className="text-2xl font-bold">S/. {summary.totalCollected.toFixed(2)}</h3>
+              <h3 className="text-2xl font-bold">S/. {summary.totalCollected}</h3>
               <p className="text-sm text-muted-foreground mt-1">Pagos completados</p>
             </div>
             <DollarSign className="h-8 w-8 text-blue-500" />

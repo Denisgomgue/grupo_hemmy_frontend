@@ -4,7 +4,7 @@ import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
 import type { Payment } from "@/types/payments/payment"
-import { usePayment } from "@/hooks/use-payment"
+import { usePayments } from "@/hooks/use-payment"
 import api from "@/lib/axios"
 import { PaymentForm } from "./_components/payment-form"
 import { ResponsiveTable } from "@/components/responsive-table"
@@ -38,11 +38,16 @@ export default function PaymentPage() {
   const [searchTerm, setSearchTerm] = React.useState("")
   const [viewMode, setViewMode] = React.useState<"list" | "grid">("list")
 
-  const { refreshPayments, fetchPaymentSummary } = usePayment()
+  const fetchPaymentSummary = async () => {
+    const response = await api.get("/payments/summary");
+    return response.data;
+  };
+
+  const { refreshPayments, payments } = usePayments()
 
   const paymentsQuery = useQuery<{ data: Payment[]; total: number }, Error>({
     queryKey: ["payments", currentPage, pageSize, currentFilter, searchTerm],
-    queryFn: () => refreshPayments(currentPage, pageSize, currentFilter),
+    queryFn: () => refreshPayments(currentPage, pageSize, currentFilter, searchTerm),
     placeholderData: (previousData) => previousData,
   })
 
@@ -58,17 +63,17 @@ export default function PaymentPage() {
   }, [paymentsQuery.data])
 
   const createPaymentFn = async (data: PaymentFormData) => {
-    const response = await api.post("/payment", data)
+    const response = await api.post("/payments", data)
     return response.data
   }
 
   const updatePaymentFn = async ({ id, data }: { id: number; data: PaymentFormData }) => {
-    const response = await api.patch(`/payment/${id}`, data)
+    const response = await api.patch(`/payments/${id}`, data)
     return response.data
   }
 
   const deletePaymentFn = async (id: number) => {
-    const response = await api.delete(`/payment/${id}`)
+    const response = await api.delete(`/payments/${id}`)
     return response.data
   }
 
@@ -258,7 +263,6 @@ export default function PaymentPage() {
       <ResponsiveTable<Payment>
         data={paymentsQuery.data?.data ?? []}
         columns={paymentColumns}
-        headers={headers}
         renderCard={(payment) => <PaymentCard payment={payment} onEdit={handleEdit} onDelete={handleDelete} />}
         isLoading={isFetchingOrMutating}
         onPaginationChange={handlePaginationChange}

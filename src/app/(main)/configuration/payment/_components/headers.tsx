@@ -1,5 +1,5 @@
 import type { Header } from "@/components/dataTable/card-table"
-import type { Payment } from "@/types/payments/payment"
+import type { Payment, PaymentType } from "@/types/payments/payment"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { PaymentStatusBadge } from "@/components/payment/payment-status-badge"
@@ -46,7 +46,7 @@ export const headers: Header[] = [
       }
       return (
         <div className="flex items-center gap-2">
-          <PaymentMethodIcon method={item.method} className="h-4 w-4" />
+          <PaymentMethodIcon method={item.paymentType as PaymentType} className="h-4 w-4" />
           <span>{methodLabels[value] || value}</span>
         </div>
       )
@@ -55,7 +55,7 @@ export const headers: Header[] = [
   {
     label: "Estado",
     key: "status",
-    render: (value: string, item: Payment) => <PaymentStatusBadge status={item.status} />,
+    render: (value: string, item: Payment) => <PaymentStatusBadge status={item.state} />,
   },
   {
     label: "Código / Referencia",

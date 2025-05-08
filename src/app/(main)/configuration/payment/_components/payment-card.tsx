@@ -5,7 +5,7 @@ import { es } from "date-fns/locale"
 import { InfoCardShell } from "@/components/info-card-shell"
 import { PaymentStatusBadge } from "@/components/payment/payment-status-badge"
 import { PaymentMethodIcon } from "@/components/payment/payment-method-icon"
-import type { Payment } from "@/types/payments/payment"
+import type { Payment, PaymentType } from "@/types/payments/payment"
 import { PaymentActionsDropdown } from "./payment-actions-dropdown"
 
 interface PaymentCardProps {
@@ -58,13 +58,13 @@ export function PaymentCard({ payment, onEdit, onDelete, onViewDetails }: Paymen
           <div>
             <div className="text-sm text-muted-foreground">Método</div>
             <div className="flex items-center gap-2">
-              <PaymentMethodIcon method={payment.method} className="h-4 w-4" />
-              <span>{methodLabels[payment.method]}</span>
+              <PaymentMethodIcon method={payment.paymentType as PaymentType} className="h-4 w-4" />
+              <span>{methodLabels[payment.paymentType as string]}</span>
             </div>
           </div>
           <div>
             <div className="text-sm text-muted-foreground">Estado</div>
-            <PaymentStatusBadge status={payment.status} />
+            <PaymentStatusBadge status={payment.state} />
           </div>
         </div>
       }

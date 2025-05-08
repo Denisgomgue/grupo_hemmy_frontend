@@ -3,7 +3,7 @@
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import type { ColumnDef } from "@tanstack/react-table"
-import type { Payment } from "@/types/payments/payment"
+import type { Payment, PaymentType } from "@/types/payments/payment"
 import { PaymentStatusBadge } from "@/components/payment/payment-status-badge"
 import { PaymentMethodIcon } from "@/components/payment/payment-method-icon"
 
@@ -44,10 +44,10 @@ export const baseColumns: ColumnDef<Payment>[] = [
     },
   },
   {
-    accessorKey: "method",
+    accessorKey: "paymentType",
     header: "Método",
     cell: ({ row }) => {
-      const method = row.getValue("method") as string
+      const paymentType = row.getValue("paymentType") as string
       const methodLabels: Record<string, string> = {
         TRANSFER: "Transferencia",
         CASH: "Efectivo",
@@ -56,8 +56,8 @@ export const baseColumns: ColumnDef<Payment>[] = [
       }
       return (
         <div className="flex items-center gap-2">
-          <PaymentMethodIcon method={row.original.method} className="h-4 w-4" />
-          <span>{methodLabels[method] || method}</span>
+          <PaymentMethodIcon method={paymentType as PaymentType} className="h-4 w-4" />
+          <span>{methodLabels[paymentType] || paymentType}</span>
         </div>
       )
     },
@@ -65,7 +65,7 @@ export const baseColumns: ColumnDef<Payment>[] = [
   {
     accessorKey: "status",
     header: "Estado",
-    cell: ({ row }) => <PaymentStatusBadge status={row.original.status} />,
+    cell: ({ row }) => <PaymentStatusBadge status={row.original.state} />,
   },
   {
     accessorKey: "reference",

@@ -15,13 +15,13 @@ export function PaymentFilterTabs({ currentFilter, onFilterChange, isLoading = f
         <TabsTrigger value="ALL" disabled={isLoading}>
           Todos
         </TabsTrigger>
-        <TabsTrigger value="PAID" disabled={isLoading}>
+        <TabsTrigger value="PAYMENT_DAILY" disabled={isLoading}>
           Pagados
         </TabsTrigger>
         <TabsTrigger value="PENDING" disabled={isLoading}>
           Pendientes
         </TabsTrigger>
-        <TabsTrigger value="LATE" disabled={isLoading}>
+        <TabsTrigger value="LATE_PAYMENT" disabled={isLoading}>
           Atrasados
         </TabsTrigger>
       </TabsList>

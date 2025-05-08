@@ -1,8 +1,8 @@
 import { CreditCard, DollarSign, Landmark, HelpCircle } from "lucide-react"
-import type { PaymentMethod } from "@/types/payments/payment"
+import type { PaymentType } from "@/types/payments/payment"
 
 interface PaymentMethodIconProps {
-  method: PaymentMethod
+  method: PaymentType
   className?: string
 }
 
@@ -12,7 +12,9 @@ export function PaymentMethodIcon({ method, className }: PaymentMethodIconProps)
       return <DollarSign className={className} />
     case "TRANSFER":
       return <Landmark className={className} />
-    case "CARD":
+    case "YAPE":
+      return <CreditCard className={className} />
+    case "PLIN":
       return <CreditCard className={className} />
     default:
       return <HelpCircle className={className} />

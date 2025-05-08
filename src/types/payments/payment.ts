@@ -1,7 +1,5 @@
-import { string } from "zod";
 import { Client } from "../clients/client";
-import { Plan } from "../plans/plan";
-import { Sector } from "../sectors/sector"
+
 
 export enum PaymentStatus {
     PENDING = 'PENDING',
@@ -13,22 +11,22 @@ export enum PaymentType {
     TRANSFER = 'TRANSFER',
     CASH = 'CASH',
     YAPE = 'YAPE',
-    PLIN = 'PLIN'
+    PLIN = 'PLIN',
+    OTHER = 'OTHER'
 }
 
 export interface Payment {
     id: number;
     paymentDate: string;
-    transfername: string;
     reference: string;
     reconnection: boolean;
     amount: number;
     state: PaymentStatus;
     paymentType?: PaymentType;
+    transfername: string;
     discount: number;
-    dueDate?: Date;
+    dueDate?: string;
     client: Client;
-    sector: Sector;
-    created_At: Date;
-    updated_At: Date;
+    created_At: string;
+    updated_At: string;
 }
