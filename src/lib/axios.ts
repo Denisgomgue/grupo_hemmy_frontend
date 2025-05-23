@@ -9,12 +9,12 @@ let authToken: string | null = null;
 
 api.interceptors.request.use(config => {
   if (authToken) {
-    config.headers['Authorization'] = `Bearer ${authToken}`;
+    config.headers[ 'Authorization' ] = `Bearer ${authToken}`;
   } else {
     const cookieToken = Cookies.get('grupo_hemmy_auth');
     if (cookieToken) {
       authToken = cookieToken;
-      config.headers['Authorization'] = `Bearer ${cookieToken}`;
+      config.headers[ 'Authorization' ] = `Bearer ${cookieToken}`;
     }
   }
   return config;
@@ -50,5 +50,5 @@ export const setAuthToken = (token: string | null) => {
     Cookies.remove('grupo_hemmy_auth');
   }
 };
-  
+
 export default api;

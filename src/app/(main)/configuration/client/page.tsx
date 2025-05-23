@@ -21,11 +21,19 @@ import { ColumnDef } from '@tanstack/react-table';
 import { PaginatedCards } from "@/components/dataTable/paginated-cards"
 import { ViewModeSwitcher } from "@/components/dataTable/view-mode-switcher"
 import { InfoSummaryCards } from "@/components/info-summary-cards"
-import { Users, UserCheck, UserPlus, UserX } from "lucide-react"
+import { Users, UserCheck, UserPlus, UserX, Clock } from "lucide-react"
 import { useEffect, useState } from "react"
 import { TableToolbar } from "@/components/dataTable/table-toolbar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+
+interface ClientSummary {
+    totalClientes: number;
+    clientesActivos: number;
+    clientesVencidos: number;
+    clientesPorVencer: number;
+    period: string;
+}
 
 export default function ClientPage() {
     const queryClient = useQueryClient();
@@ -35,18 +43,35 @@ export default function ClientPage() {
     const [ currentPage, setCurrentPage ] = React.useState(1);
     const [ pageSize, setPageSize ] = React.useState(10);
     const [ totalRecords, setTotalRecords ] = React.useState(0);
-    const [ viewMode, setViewMode ] = React.useState<"list" | "grid">("list")
-    const [ searchTerm, setSearchTerm ] = useState("")
+    const [ viewMode, setViewMode ] = React.useState<"list" | "grid">("list");
+    const [ searchTerm, setSearchTerm ] = useState("");
+    const [ isLoading, setIsLoading ] = useState(false);
+    const [ isSubmitting, setIsSubmitting ] = useState(false);
 
-    const { refreshClient } = useClient();
+    const { refreshClient, getClientSummary } = useClient();
 
-    const clientsQuery = useQuery<
-        { data: Client[]; total: number },
-        Error
-    >({
+    // Query para obtener los clientes
+    const clientsQuery = useQuery<{ data: Client[]; total: number }, Error>({
         queryKey: [ "clients", currentPage, pageSize ],
         queryFn: () => refreshClient(currentPage, pageSize),
-        placeholderData: (previousData) => previousData,
+    });
+
+    // Query para obtener el resumen de clientes
+    const summaryQuery = useQuery<ClientSummary>({
+        queryKey: [ "clientSummary" ],
+        queryFn: () => getClientSummary(),
+    });
+
+    // Query para obtener clientes nuevos del mes
+    const newClientsQuery = useQuery<ClientSummary>({
+        queryKey: [ "clientSummary", "thisMonth" ],
+        queryFn: () => getClientSummary("thisMonth"),
+        initialData: {
+            active: 0,
+            inactive: 0,
+            new: 0,
+            total: 0
+        }
     });
 
     React.useEffect(() => {
@@ -72,7 +97,8 @@ export default function ClientPage() {
 
     const mutationOptions = {
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [ "clients", currentPage, pageSize ] });
+            queryClient.invalidateQueries({ queryKey: [ "clients" ] });
+            queryClient.invalidateQueries({ queryKey: [ "clientSummary" ] });
             setIsModalOpen(false);
             setSelectedClient(null);
             toast({
@@ -101,7 +127,8 @@ export default function ClientPage() {
     const deleteMutation = useMutation<unknown, Error, number>({
         mutationFn: deleteClientFn,
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [ "clients", currentPage, pageSize ] });
+            queryClient.invalidateQueries({ queryKey: [ "clients" ] });
+            queryClient.invalidateQueries({ queryKey: [ "clientSummary" ] });
             toast({
                 title: "Cliente eliminado correctamente",
             });
@@ -136,10 +163,15 @@ export default function ClientPage() {
     };
 
     const handleSave = (values: ClientFormData) => {
-        if (selectedClient) {
-            updateMutation.mutate({ id: selectedClient.id, data: values });
-        } else {
-            createMutation.mutate(values);
+        setIsSubmitting(true);
+        try {
+            if (selectedClient) {
+                updateMutation.mutate({ id: selectedClient.id, data: values });
+            } else {
+                createMutation.mutate(values);
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -150,7 +182,9 @@ export default function ClientPage() {
 
     const handleReload = () => {
         clientsQuery.refetch();
-    }
+        summaryQuery.refetch();
+        newClientsQuery.refetch();
+    };
 
     const clientColumns = React.useMemo((): ColumnDef<Client>[] => {
         const columnsBase = baseColumns;
@@ -172,89 +206,60 @@ export default function ClientPage() {
     const isLoadingMutation = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
     const isFetchingOrMutating = clientsQuery.isFetching || isLoadingMutation;
 
-    // Animación de conteo para los valores de los cards
-    const [ activeClients, setActiveClients ] = useState(0)
-    const [ newClients, setNewClients ] = useState(0)
-    const [ inactiveClients, setInactiveClients ] = useState(0)
-    const [ totalClients, setTotalClients ] = useState(0)
-
-    React.useEffect(() => {
-        // Simular valores finales (puedes reemplazar por datos reales)
-        const finalActive = 120
-        const finalNew = 8
-        const finalInactive = 5
-        const finalTotal = 133
-        // Animar conteo
-        let a = 0, n = 0, i = 0, t = 0
-        const steps = 30
-        const duration = 600
-        const interval = setInterval(() => {
-            a = Math.min(finalActive, a + Math.ceil(finalActive / steps))
-            n = Math.min(finalNew, n + Math.ceil(finalNew / steps))
-            i = Math.min(finalInactive, i + Math.ceil(finalInactive / steps))
-            t = Math.min(finalTotal, t + Math.ceil(finalTotal / steps))
-            setActiveClients(a)
-            setNewClients(n)
-            setInactiveClients(i)
-            setTotalClients(t)
-            if (a === finalActive && n === finalNew && i === finalInactive && t === finalTotal) clearInterval(interval)
-        }, duration / steps)
-        return () => clearInterval(interval)
-    }, [])
-
-    // Manejador de búsqueda
-    const handleSearch = () => {
-        // Aquí puedes recargar los datos usando searchTerm
-        clientsQuery.refetch()
-    }
-
     return (
         <MainContainer>
             <HeaderActions title="Gestión de Clientes">
-                <ReloadButton onClick={handleReload} isLoading={isFetchingOrMutating} />
+                <ReloadButton
+                    onClick={handleReload}
+                    isLoading={isFetchingOrMutating || summaryQuery.isFetching}
+                />
                 <AddButton onClick={handleAdd} text="Agregar Cliente" />
             </HeaderActions>
 
-            {/* Cards informativos con animación */}
+            {/* Cards informativos actualizados */}
             <InfoSummaryCards
                 cards={[
                     {
-                        title: "Clientes Activos",
-                        value: activeClients,
-                        description: "Actualmente activos",
-                        icon: <UserCheck className="h-8 w-8 text-green-500" />,
-                        borderColor: "border-l-green-500"
-                    },
-                    {
-                        title: "Clientes Nuevos",
-                        value: newClients,
-                        description: "Este mes",
-                        icon: <UserPlus className="h-8 w-8 text-blue-500" />,
-                        borderColor: "border-l-blue-500"
-                    },
-                    {
-                        title: "Clientes Inactivos",
-                        value: inactiveClients,
-                        description: "Actualmente inactivos",
-                        icon: <UserX className="h-8 w-8 text-red-500" />,
-                        borderColor: "border-l-red-500"
-                    },
-                    {
                         title: "Total Clientes",
-                        value: totalClients,
+                        value: summaryQuery.data?.totalClientes || 0,
                         description: "En el sistema",
                         icon: <Users className="h-8 w-8 text-purple-500" />,
-                        borderColor: "border-l-purple-500"
+                        borderColor: "border-l-purple-500",
+                        isLoading: summaryQuery.isLoading || summaryQuery.isFetching
+                    },
+                    {
+                        title: "Clientes Activos",
+                        value: summaryQuery.data?.clientesActivos || 0,
+                        description: "Al día con sus pagos",
+                        icon: <UserCheck className="h-8 w-8 text-green-500" />,
+                        borderColor: "border-l-green-500",
+                        isLoading: summaryQuery.isLoading || summaryQuery.isFetching
+                    },
+                    {
+                        title: "Clientes Vencidos",
+                        value: summaryQuery.data?.clientesVencidos || 0,
+                        description: "Con pagos vencidos",
+                        icon: <UserX className="h-8 w-8 text-red-500" />,
+                        borderColor: "border-l-red-500",
+                        isLoading: summaryQuery.isLoading || summaryQuery.isFetching
+                    },
+                    {
+                        title: "Por Vencer",
+                        value: summaryQuery.data?.clientesPorVencer || 0,
+                        description: "Próximos a vencer",
+                        icon: <Clock className="h-8 w-8 text-yellow-500" />,
+                        borderColor: "border-l-yellow-500",
+                        isLoading: summaryQuery.isLoading || summaryQuery.isFetching
                     }
                 ]}
             />
 
-            {/* Selector de vista */}
+            {/* Selector de vista y barra de herramientas */}
             <div className="flex items-center justify-between">
                 <TableToolbar
                     value={searchTerm}
                     onValueChange={setSearchTerm}
-                    onSearch={handleSearch}
+                    onSearch={handleReload}
                     searchPlaceholder="Buscar clientes..."
                     filters={
                         <Select defaultValue="active">
@@ -276,9 +281,6 @@ export default function ClientPage() {
                 />
                 <ViewModeSwitcher viewMode={viewMode} setViewMode={(mode) => setViewMode(mode as "list" | "grid")} />
             </div>
-
-            {/* Barra de búsqueda, filtros y acciones */}
-
 
             {viewMode === "list" ? (
                 <ResponsiveTable<Client>
@@ -324,7 +326,7 @@ export default function ClientPage() {
                     <ClientForm
                         client={selectedClient}
                         onSubmit={handleSave}
-                        isLoading={isLoadingMutation}
+                        isLoading={isSubmitting}
                         onCancel={() => setIsModalOpen(false)}
                     />
                 </DialogContent>

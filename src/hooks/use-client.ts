@@ -9,8 +9,16 @@ const notifyListeners = () => {
     listeners.forEach((listener) => listener())
 }
 
+interface ClientSummary {
+    totalClientes: number;
+    clientesActivos: number;
+    clientesVencidos: number;
+    clientesPorVencer: number;
+    period: string;
+}
+
 export function useClient() {
-    const [client, setClient] = useState<Client[]>(clientList)
+    const [ client, setClient ] = useState<Client[]>(clientList)
 
     const refreshClient = useCallback(async (page: number = 1, pageSize: number = 10) => {
         try {
@@ -25,7 +33,7 @@ export function useClient() {
             return { data: clientList, total: clientList.length }
         } catch (error) {
             console.error("Error fetching clients:", error)
-            return { data: [], total: 0 }
+            throw error
         }
     }, [])
 
@@ -39,8 +47,26 @@ export function useClient() {
         }
     }, []);
 
+    const getClientSummary = useCallback(async (period?: string) => {
+        try {
+            const response = await api.get<ClientSummary>("/client/summary", {
+                params: period ? { period } : {}
+            });
+            return response.data;
+        } catch (error) {
+            console.error("Error fetching client summary:", error);
+            return {
+                totalClientes: 0,
+                clientesActivos: 0,
+                clientesVencidos: 0,
+                clientesPorVencer: 0,
+                period: period || "all"
+            };
+        }
+    }, []);
+
     useEffect(() => {
-        const listener = () => setClient([...clientList])
+        const listener = () => setClient([ ...clientList ])
         listeners.push(listener)
 
         return () => {
@@ -48,5 +74,5 @@ export function useClient() {
         }
     }, [])
 
-    return { client, refreshClient, getClientById }
+    return { client, refreshClient, getClientById, getClientSummary }
 }

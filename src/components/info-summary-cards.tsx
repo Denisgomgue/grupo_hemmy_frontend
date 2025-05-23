@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import React from "react"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export interface InfoCardConfig {
     title: string
@@ -10,6 +11,7 @@ export interface InfoCardConfig {
     bgColor?: string
     textColor?: string
     extra?: React.ReactNode // Para botones, acciones, etc.
+    isLoading?: boolean
 }
 
 export function InfoSummaryCards({ cards }: { cards: InfoCardConfig[] }) {
@@ -25,7 +27,11 @@ export function InfoSummaryCards({ cards }: { cards: InfoCardConfig[] }) {
                             <div>
                                 <p className={`text-sm font-medium mb-1 ${card.textColor || "text-muted-foreground"}`}>{card.title}</p>
                                 <div className="flex items-center gap-2">
-                                    <h3 className={`text-2xl font-bold ${card.textColor || ""}`}>{card.value}</h3>
+                                    {card.isLoading ? (
+                                        <Skeleton className="h-8 w-16" />
+                                    ) : (
+                                        <h3 className={`text-2xl font-bold ${card.textColor || ""}`}>{card.value}</h3>
+                                    )}
                                     {card.extra}
                                 </div>
                                 {card.description && (
