@@ -10,12 +10,15 @@ import { ClientActionsDropdown } from "./client-actions-dropdown";
 import { InfoCardShell } from "./info-card-shell";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { getAccountStatusLabel } from "@/utils/account-status-labels";
+import { getClientPaymentStatusLabel } from "@/utils/client-payment-status-labels";
+import Link from "next/link";
 
 // --- Helpers (Movidos aquí desde headers.tsx) ---
 
-const getAccountStatusVariant = (status: AccountStatus): "success" | "secondary" | "destructive" | "outline" => {
-     switch (status) {
-        case AccountStatus.ACTIVE: return "success";
+const getAccountStatusVariant = (status: AccountStatus): "accountSuccess" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+        case AccountStatus.ACTIVE: return "accountSuccess";
         case AccountStatus.SUSPENDED: return "secondary";
         case AccountStatus.INACTIVE: return "destructive";
         default: return "outline";
@@ -38,17 +41,17 @@ const getPaymentStatusVariant = (status: PaymentStatus): "success" | "secondary"
 }
 
 const getPaymentStatus = (paymentDateStr: string | null | undefined): { text: string; variant: "success" | "warning" | "destructive" | "outline" } => {
-     if (!paymentDateStr) return { text: "N/D", variant: "outline" };
-     const paymentDate = new Date(paymentDateStr);
-     const today = new Date();
-     const sevenDaysFromNow = new Date();
-     sevenDaysFromNow.setDate(today.getDate() + 7);
-     paymentDate.setHours(0, 0, 0, 0);
-     today.setHours(0, 0, 0, 0);
-     sevenDaysFromNow.setHours(0, 0, 0, 0);
-     if (paymentDate < today) return { text: "En mora", variant: "destructive" };
-     if (paymentDate >= today && paymentDate <= sevenDaysFromNow) return { text: "Por vencer", variant: "warning" }; 
-     return { text: "Al día", variant: "success" };
+    if (!paymentDateStr) return { text: "N/D", variant: "outline" };
+    const paymentDate = new Date(paymentDateStr);
+    const today = new Date();
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(today.getDate() + 7);
+    paymentDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    sevenDaysFromNow.setHours(0, 0, 0, 0);
+    if (paymentDate < today) return { text: "En mora", variant: "destructive" };
+    if (paymentDate >= today && paymentDate <= sevenDaysFromNow) return { text: "Por vencer", variant: "warning" };
+    return { text: "Al día", variant: "success" };
 };
 
 const getServiceIcon = (serviceName: string | undefined) => {
@@ -58,6 +61,24 @@ const getServiceIcon = (serviceName: string | undefined) => {
     return <Settings className="h-4 w-4 text-muted-foreground" />;
 }
 
+// Función para generar color basado en el nombre
+const getAvatarColor = (name: string): string => {
+    const colors = [
+        "bg-blue-500",
+        "bg-green-500",
+        "bg-purple-500",
+        "bg-yellow-500",
+        "bg-pink-500",
+        "bg-indigo-500",
+        "bg-red-500",
+        "bg-teal-500"
+    ];
+
+    // Usar la suma de los códigos ASCII de las letras del nombre como semilla
+    const seed = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[ seed % colors.length ];
+};
+
 // --- Definición del Componente Card ---
 
 interface ClientCardProps {
@@ -66,26 +87,30 @@ interface ClientCardProps {
 }
 
 export function ClientCard({ client, onEdit }: ClientCardProps) {
-    // Comprobación por si acaso, aunque headers.tsx ya no debería pasar undefined
     if (!client) return null;
 
-    const initial = client.name ? client.name[0].toUpperCase() : "?";
+    const initial = client.name ? client.name[ 0 ].toUpperCase() : "?";
+    const avatarColor = getAvatarColor(client.name + client.lastName);
     const paymentInfo = getPaymentStatus(client.paymentDate);
     const paymentBadgeVariant = paymentInfo.variant === 'warning' ? 'secondary' : paymentInfo.variant;
     const clientOwnPaymentStatus = client.paymentStatus;
 
-    // Definir el contenido de cada sección
     const topSectionContent = (
         <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-                <Avatar className="h-9 w-9 text-sm">
-                    <AvatarFallback>{initial}</AvatarFallback>
-                </Avatar>
-                <div>
-                    <div className="font-semibold">{client.name} {client.lastName}</div>
-                    <div className="text-xs text-muted-foreground">Sector: {client.sector?.name || 'N/A'}</div>
+            <Link
+                href={`/configuration/client/${client.id}`}
+                className="flex-1 hover:bg-purple-100 rounded-lg transition-colors p-2 -m-2"
+            >
+                <div className="flex items-center gap-3">
+                    <Avatar className={`h-9 w-9 text-sm ${avatarColor} text-black`}>
+                        <AvatarFallback>{initial}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <div className="font-semibold">{client.name} {client.lastName}</div>
+                        <div className="text-xs text-muted-foreground">Sector: {client.sector?.name || 'N/A'}</div>
+                    </div>
                 </div>
-            </div>
+            </Link>
             <ClientActionsDropdown client={client} onEdit={onEdit} />
         </div>
     );
@@ -99,7 +124,7 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
             </div>
             <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Servicio</div>
-                    <div className="flex items-center gap-1.5 font-medium">
+                <div className="flex items-center gap-1.5 font-medium">
                     {getServiceIcon(client.plan?.service?.name)}
                     <span>{client.plan?.service?.name || 'N/A'}</span>
                 </div>
@@ -112,11 +137,8 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
             <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Estado Cuenta / Pago</div>
                 <div className="flex flex-col items-start gap-1">
-                    <Badge variant={getAccountStatusVariant(client.status)}>{client.status}</Badge>
-                    <Badge variant={paymentBadgeVariant}>{paymentInfo.text}</Badge>
-                    {clientOwnPaymentStatus && (
-                        <Badge variant={getPaymentStatusVariant(clientOwnPaymentStatus)}>{clientOwnPaymentStatus}</Badge>
-                    )}
+                    <Badge variant={getAccountStatusVariant(client.status)}>{getAccountStatusLabel(client.status)}</Badge>
+                    <Badge variant={getPaymentStatusVariant(clientOwnPaymentStatus)}>{getClientPaymentStatusLabel(clientOwnPaymentStatus)}</Badge>
                 </div>
             </div>
         </div>
@@ -129,31 +151,20 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
                 <div className="font-medium">{client.phone || 'N/A'}</div>
             </div>
             <div>
-                    <div className="text-xs text-muted-foreground mb-0.5">Renta</div>
-                    <div className="font-medium">{client.advancePayment ? "Adelantada" : "Pendiente"}</div>
+                <div className="text-xs text-muted-foreground mb-0.5">Renta</div>
+                <div className="font-medium">{client.advancePayment ? "Adelantada" : "Pendiente"}</div>
             </div>
         </div>
     );
 
     // Renderizar usando el Shell
     return (
-        <Card className="w-full mb-4">
-            <CardHeader>
-                <CardTitle className="flex items-center">
-                    {client.name} {client.lastName}
-                </CardTitle>
-                <CardDescription>
-                    <StatusBadge status={client.paymentStatus} />
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <InfoCardShell 
-                    topSection={topSectionContent}
-                    middleSection={middleSectionContent}
-                    bottomSection={bottomSectionContent}
-                />
-            </CardContent>
-        </Card>
+        <CardContent>
+            <InfoCardShell
+                topSection={topSectionContent}
+                middleSection={middleSectionContent}
+                bottomSection={bottomSectionContent}
+            />
+        </CardContent>
     );
-
 } 

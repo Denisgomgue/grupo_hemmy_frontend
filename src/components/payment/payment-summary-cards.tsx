@@ -1,5 +1,6 @@
+import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { DollarSign, CheckCircle, Clock, AlertTriangle } from "lucide-react"
+import { Eye, EyeOff, DollarSign, CheckCircle, Clock, AlertTriangle } from "lucide-react"
 
 export interface PaymentSummary {
   totalCollected: number;
@@ -14,10 +15,38 @@ interface PaymentSummaryCardsProps {
 }
 
 export function PaymentSummaryCards({ summary, isLoading = false }: PaymentSummaryCardsProps) {
+  const [ showAmount, setShowAmount ] = useState(false)
+  const [ displayedAmount, setDisplayedAmount ] = useState(0)
+
+  // Animación de conteo
+  const handleToggleAmount = () => {
+    if (!showAmount) {
+      let start = 0
+      const end = summary.totalCollected || 0
+      const duration = 600 // ms
+      const steps = 30
+      const increment = end / steps
+      let current = 0
+      setDisplayedAmount(0)
+      setShowAmount(true)
+      const interval = setInterval(() => {
+        current += increment
+        if (current >= end) {
+          setDisplayedAmount(end)
+          clearInterval(interval)
+        } else {
+          setDisplayedAmount(Math.round(current))
+        }
+      }, duration / steps)
+    } else {
+      setShowAmount(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {[...Array(4)].map((_, i) => (
+        {[ ...Array(4) ].map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-6 h-32"></CardContent>
           </Card>
@@ -33,7 +62,21 @@ export function PaymentSummaryCards({ summary, isLoading = false }: PaymentSumma
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Total Recaudado</p>
-              <h3 className="text-2xl font-bold">S/. {summary.totalCollected}</h3>
+              <div className="flex items-center justify-between gap-6">
+                <h3 className="text-2xl font-bold select-none">
+                  S/. {showAmount
+                    ? displayedAmount.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : "------"}
+                </h3>
+                <button
+                  type="button"
+                  aria-label={showAmount ? "Ocultar monto" : "Mostrar monto"}
+                  onClick={handleToggleAmount}
+                  className="focus:outline-none bg-transparent flex items-center justify-center"
+                >
+                  {showAmount ? <EyeOff className="h-6 w-6 text-blue-100 hover:text-blue-500" /> : <Eye className="h-6 w-6 text-blue-100 hover:text-blue-500" />}
+                </button>
+              </div>
               <p className="text-sm text-muted-foreground mt-1">Pagos completados</p>
             </div>
             <DollarSign className="h-8 w-8 text-blue-500" />

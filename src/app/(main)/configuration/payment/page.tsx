@@ -25,30 +25,33 @@ import { LayoutGrid, List, Search } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ColumnDef } from "@tanstack/react-table"
 import { useState, useEffect } from "react"
+import { PaginatedCards } from "@/components/dataTable/paginated-cards"
+import { ViewModeSwitcher } from "@/components/dataTable/view-mode-switcher"
+import { TableToolbar } from "@/components/dataTable/table-toolbar"
 
 export default function PaymentPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
-  const [totalRecords, setTotalRecords] = useState(0)
-  const [currentFilter, setCurrentFilter] = useState("ALL")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list")
-  const [paymentSummary, setPaymentSummary] = useState({
+  const [ isModalOpen, setIsModalOpen ] = useState(false)
+  const [ selectedPayment, setSelectedPayment ] = useState<Payment | null>(null)
+  const [ currentPage, setCurrentPage ] = useState(1)
+  const [ pageSize, setPageSize ] = useState(10)
+  const [ totalRecords, setTotalRecords ] = useState(0)
+  const [ currentFilter, setCurrentFilter ] = useState("ALL")
+  const [ searchTerm, setSearchTerm ] = useState("")
+  const [ viewMode, setViewMode ] = useState<"list" | "grid">("list")
+  const [ paymentSummary, setPaymentSummary ] = useState({
     totalRecaudado: 0,
     pagosPagados: 0,
     pagosPendientes: 0,
     pagosAtrasados: 0,
     periodoUtilizado: 'thisMonth'
   })
-  const [isLoading, setIsLoading] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [ isLoading, setIsLoading ] = useState(false)
+  const [ isSubmitting, setIsSubmitting ] = useState(false)
 
-  const { 
-    refreshPayments, 
+  const {
+    refreshPayments,
     payments,
     createPayment,
     updatePayment,
@@ -86,7 +89,7 @@ export default function PaymentPage() {
   // Cargar datos al cambiar los filtros
   useEffect(() => {
     loadPayments()
-  }, [currentPage, pageSize, currentFilter, searchTerm])
+  }, [ currentPage, pageSize, currentFilter, searchTerm ])
 
   // Cargar resumen al inicio
   useEffect(() => {
@@ -109,7 +112,7 @@ export default function PaymentPage() {
       toast({ title: "ID de pago inválido", variant: "destructive" })
       return
     }
-    
+
     setIsLoading(true)
     try {
       await deletePayment(idAsNumber)
@@ -167,9 +170,12 @@ export default function PaymentPage() {
     setCurrentPage(1)
   }
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSearch = () => {
     loadPayments()
+  }
+
+  const handleSetViewMode = (mode: string) => {
+    if (mode === "list" || mode === "grid") setViewMode(mode)
   }
 
   const paymentColumns = React.useMemo((): ColumnDef<Payment>[] => {
@@ -187,7 +193,7 @@ export default function PaymentPage() {
         ),
       },
     ]
-  }, [handleDelete, handleEdit])
+  }, [ handleDelete, handleEdit ])
 
   return (
     <MainContainer>
@@ -215,50 +221,33 @@ export default function PaymentPage() {
       />
 
       {/* Search and View Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-        <form onSubmit={handleSearch} className="w-full md:w-auto">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar..."
-              className="w-full md:w-[300px] pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </form>
-        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
-          <Select defaultValue="recent">
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Ordenar por" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="recent">Más Reciente</SelectItem>
-              <SelectItem value="oldest">Más Antiguo</SelectItem>
-              <SelectItem value="amount-high">Mayor Monto</SelectItem>
-              <SelectItem value="amount-low">Menor Monto</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex border rounded-md">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="icon"
-              className="rounded-r-none"
-              onClick={() => setViewMode("list")}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="icon"
-              className="rounded-l-none"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      <div className="flex items-center justify-between mb-6">
+        <TableToolbar
+          value={searchTerm}
+          onValueChange={setSearchTerm}
+          onSearch={handleSearch}
+          searchPlaceholder="Buscar pagos..."
+          filters={
+            <Select defaultValue="recent">
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Más Reciente</SelectItem>
+                <SelectItem value="oldest">Más Antiguo</SelectItem>
+                <SelectItem value="amount-high">Mayor Monto</SelectItem>
+                <SelectItem value="amount-low">Menor Monto</SelectItem>
+              </SelectContent>
+            </Select>
+          }
+          actions={
+            <>
+              <Button variant="outline">Exportar</Button>
+              <Button variant="outline">Importar</Button>
+            </>
+          }
+        />
+        <ViewModeSwitcher viewMode={viewMode} setViewMode={handleSetViewMode} />
       </div>
 
       {/* Content */}
@@ -276,26 +265,21 @@ export default function PaymentPage() {
           }}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {isLoading ? (
-            Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="h-64 rounded-lg bg-muted animate-pulse" />
-            ))
-          ) : payments.length > 0 ? (
-            payments.map((payment) => (
-              <PaymentCard
-                key={payment.id}
-                payment={payment}
-                onEdit={() => handleEdit(payment)}
-                onDelete={() => handleDelete(payment.id.toString())}
-              />
-            ))
-          ) : (
-            <div className="col-span-full flex flex-col items-center justify-center py-12">
-              <p className="text-muted-foreground">No se encontraron pagos con los filtros seleccionados.</p>
-            </div>
+        <PaginatedCards
+          data={payments}
+          totalRecords={totalRecords}
+          pageSize={pageSize}
+          onPaginationChange={handlePaginationChange}
+          renderCard={(payment) => (
+            <PaymentCard
+              key={payment.id}
+              payment={payment}
+              onEdit={() => handleEdit(payment)}
+              onDelete={() => handleDelete(payment.id.toString())}
+            />
           )}
-        </div>
+          isLoading={isLoading}
+        />
       )}
 
       {/* Payment Form Modal */}

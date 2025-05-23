@@ -33,22 +33,33 @@ interface CanProps {
 }
 
 export function SidebarMenuItem({ icon: Icon, title, href, isCollapsed, children, isActive }: SidebarMenuItemProps) {
-    const [isOpen, setIsOpen] = React.useState(false);
+    const [ isOpen, setIsOpen ] = React.useState(false);
     const hasChildren = React.Children.count(children) > 0
     const ability = useAbility()
 
+    // Detectar si algún hijo está activo
+    const hasActiveChild = React.Children.toArray(children).some(child => {
+        if (React.isValidElement(child) && 'isActive' in (child.props as any)) {
+            return (child.props as any).isActive;
+        }
+        return false;
+    });
+
     const MenuContent = () => (
-        <>
+        <div className={cn(
+            "flex items-center w-full",
+            !isCollapsed ? "justify-between" : "justify-center"
+        )}>
             <Icon className={cn("h-5 w-5 shrink-0", !isCollapsed && "mr-2")} />
             {!isCollapsed && (
-                <>
+                <div className="flex items-center justify-between w-full gap-2">
                     <span className="flex-1 truncate text-left">{title}</span>
                     {hasChildren && (
                         <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform duration-200", isOpen && "rotate-180")} />
                     )}
-                </>
+                </div>
             )}
-        </>
+        </div>
     )
 
     const MenuButton = React.forwardRef<HTMLButtonElement, React.ComponentProps<typeof Button>>((props, ref) => {
@@ -65,7 +76,8 @@ export function SidebarMenuItem({ icon: Icon, title, href, isCollapsed, children
                                 className={cn(
                                     "w-full",
                                     isCollapsed ? "justify-center px-2" : "justify-start text-left",
-                                    isActive && "bg-accent text-accent-foreground",
+                                    isActive && "bg-[#5E3583] text-white",
+                                    !isCollapsed && hasActiveChild && !isActive && "bg-[#5E358] text-white"
                                 )}
                                 asChild
                                 {...props}
@@ -91,7 +103,8 @@ export function SidebarMenuItem({ icon: Icon, title, href, isCollapsed, children
                             className={cn(
                                 "w-full",
                                 isCollapsed ? "justify-center px-2" : "justify-start text-left",
-                                isActive && "bg-accent text-accent-foreground",
+                                isActive && "bg-[#5E3583] text-white",
+                                !isCollapsed && hasActiveChild && !isActive && "bg-[#5E3583] text-white"
                             )}
                             {...props}
                         >
@@ -149,7 +162,7 @@ export function SidebarMenuItem({ icon: Icon, title, href, isCollapsed, children
 
     if (isCollapsed && hasChildren) {
         const validItems = getValidMenuItems(children);
-        
+
         if (validItems.length === 0) {
             return null;
         }
@@ -162,7 +175,7 @@ export function SidebarMenuItem({ icon: Icon, title, href, isCollapsed, children
                             <TooltipTrigger asChild>
                                 <Button
                                     variant="ghost"
-                                    className={cn("w-full justify-center px-2", isActive && "bg-accent text-accent-foreground")}
+                                    className={cn("w-full justify-center px-2", isActive && "bg-[#5E3583] text-white")}
                                 >
                                     <Icon className="h-5 w-5" />
                                 </Button>
@@ -179,10 +192,32 @@ export function SidebarMenuItem({ icon: Icon, title, href, isCollapsed, children
     }
 
     if (hasChildren) {
+        if (isCollapsed) {
+            // Menú colapsado: solo mostrar el botón sin w-full ni fondo especial
+            return (
+                <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                    <CollapsibleTrigger asChild>
+                        <MenuButton />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pl-6 pt-1">
+                        <div className="flex flex-col space-y-1">{children}</div>
+                    </CollapsibleContent>
+                </Collapsible>
+            )
+        }
+        // Menú expandido: aplicar w-full y fondo especial
         return (
             <Collapsible open={isOpen} onOpenChange={setIsOpen}>
                 <CollapsibleTrigger asChild>
-                    <MenuButton />
+                    <div className="w-full">
+                        <MenuButton
+                            className={cn(
+                                "w-full",
+                                hasActiveChild && !isActive && "bg-[#5E3583] text-white",
+                                isActive && "bg-[#5E3583] text-white"
+                            )}
+                        />
+                    </div>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pl-6 pt-1">
                     <div className="flex flex-col space-y-1">{children}</div>

@@ -20,6 +20,7 @@ import { PaymentSchema, type PaymentFormData, PaymentTypeEnum, PaymentStatusEnum
 import api from "@/lib/axios"
 import type { Client } from "@/types/clients/client"
 import type { Payment } from "@/types/payments/payment"
+import { getPaymentTypeLabel } from "@/utils/payment-type-labels"
 
 interface PaymentFormProps {
   payment?: Payment | null
@@ -29,14 +30,17 @@ interface PaymentFormProps {
 }
 
 export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: PaymentFormProps) {
-  const [autoCalculateState, setAutoCalculateState] = useState(true)
-  
+  const [ autoCalculateState, setAutoCalculateState ] = useState(true)
+  const [ isPaymentDatePickerOpen, setIsPaymentDatePickerOpen ] = useState(false);
+
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(PaymentSchema),
     defaultValues: {
       client: payment?.client.id || undefined,
-      amount: payment?.amount ?? 0,
-      paymentDate: payment?.paymentDate || format(new Date(), "yyyy-MM-dd"),
+      amount: (payment?.amount !== undefined && payment?.amount !== null && !isNaN(parseFloat(String(payment.amount))))
+        ? parseFloat(String(payment.amount))
+        : 0,
+      paymentDate: payment?.paymentDate || "",
       paymentType: payment?.paymentType || PaymentTypeEnum.Enum.TRANSFER,
       state: payment?.state || PaymentStatusEnum.Enum.PENDING,
       reference: payment?.reference || "",
@@ -53,7 +57,7 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
   const watchedClient = form.watch("client")
 
   const { data: clientsData, isLoading: isLoadingClients } = useQuery({
-    queryKey: ["clients-minimal"],
+    queryKey: [ "clients-minimal" ],
     queryFn: async (): Promise<{ data: Client[] }> => {
       const response = await api.get<Client[]>("/client") // Asume que /client devuelve Client[] directamente
       return { data: response.data } // Envuelve para que coincida con la expectativa de { data: Client[] }
@@ -70,56 +74,56 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
         form.setValue("dueDate", format(new Date(selectedClient.paymentDate), "yyyy-MM-dd"));
       }
     }
-  }, [watchedClient, clients, form]);
+  }, [ watchedClient, clients, form ]);
 
   // Limpiar transfername cuando se cambia a un método de pago que no lo requiere
   useEffect(() => {
-    const requiresTransferName = 
-      watchedPaymentType === PaymentTypeEnum.Enum.TRANSFER || 
-      watchedPaymentType === PaymentTypeEnum.Enum.YAPE || 
+    const requiresTransferName =
+      watchedPaymentType === PaymentTypeEnum.Enum.TRANSFER ||
+      watchedPaymentType === PaymentTypeEnum.Enum.YAPE ||
       watchedPaymentType === PaymentTypeEnum.Enum.PLIN;
-    
+
     if (!requiresTransferName) {
       form.setValue('transfername', '');
       form.clearErrors('transfername');
     }
-  }, [watchedPaymentType, form]);
+  }, [ watchedPaymentType, form ]);
 
   // Calcular automáticamente el estado del pago
   useEffect(() => {
     if (!autoCalculateState) return;
-    
+
     const calculatePaymentState = () => {
       const dueDate = watchedDueDate ? new Date(watchedDueDate) : null;
       const paymentDate = watchedPaymentDate ? new Date(watchedPaymentDate) : null;
       const today = new Date();
-      
+
       // Si no hay fecha de vencimiento, mantener como pendiente
       if (!dueDate) {
-        form.setValue("state", PaymentStatusEnum.Enum.PENDING);
+        // form.setValue("state", PaymentStatusEnum.Enum.PENDING);
         return;
       }
-      
+
       // Si hay fecha de pago
       if (paymentDate) {
         if (paymentDate > dueDate) {
-          form.setValue("state", PaymentStatusEnum.Enum.LATE_PAYMENT);
+          // form.setValue("state", PaymentStatusEnum.Enum.LATE_PAYMENT);
         } else {
-          form.setValue("state", PaymentStatusEnum.Enum.PAYMENT_DAILY);
+          // form.setValue("state", PaymentStatusEnum.Enum.PAYMENT_DAILY);
         }
-      } 
+      }
       // Si no hay fecha de pago
       else {
         if (today > dueDate) {
-          form.setValue("state", PaymentStatusEnum.Enum.LATE_PAYMENT);
+          // form.setValue("state", PaymentStatusEnum.Enum.LATE_PAYMENT);
         } else {
-          form.setValue("state", PaymentStatusEnum.Enum.PENDING);
+          // form.setValue("state", PaymentStatusEnum.Enum.PENDING);
         }
       }
     };
-    
+
     calculatePaymentState();
-  }, [watchedPaymentDate, watchedDueDate, form, autoCalculateState]);
+  }, [ watchedPaymentDate, watchedDueDate, form, autoCalculateState ]);
 
   return (
     <Form {...form}>
@@ -128,31 +132,31 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
         // Asegurarse de que el descuento sea siempre un número
         const values = form.getValues();
         const discountValue = values.discount;
-        
+
         // Verificar si el descuento es nulo, indefinido, o no es un número válido
-        if (discountValue === null || discountValue === undefined || 
-            (typeof discountValue === 'string' && (discountValue === '' || isNaN(Number(discountValue)))) ||
-            (typeof discountValue === 'number' && isNaN(discountValue))) {
+        if (discountValue === null || discountValue === undefined ||
+          (typeof discountValue === 'string' && (discountValue === '' || isNaN(Number(discountValue)))) ||
+          (typeof discountValue === 'number' && isNaN(discountValue))) {
           form.setValue('discount', 0);
         } else if (typeof discountValue === 'string') {
           // Convertir string a número
           form.setValue('discount', Number(discountValue));
         }
-        
+
         // Verificar que el campo transfername tenga valor cuando es obligatorio
         const paymentType = values.paymentType;
-        const needsTransferName = paymentType === PaymentTypeEnum.Enum.TRANSFER || 
-                                 paymentType === PaymentTypeEnum.Enum.YAPE || 
-                                 paymentType === PaymentTypeEnum.Enum.PLIN;
-        
+        const needsTransferName = paymentType === PaymentTypeEnum.Enum.TRANSFER ||
+          paymentType === PaymentTypeEnum.Enum.YAPE ||
+          paymentType === PaymentTypeEnum.Enum.PLIN;
+
         if (needsTransferName && (!values.transfername || values.transfername.trim() === '')) {
-          form.setError('transfername', { 
-            type: 'manual', 
-            message: 'El nombre/referencia es obligatorio para este método de pago' 
+          form.setError('transfername', {
+            type: 'manual',
+            message: 'El nombre/referencia es obligatorio para este método de pago'
           });
           return; // Detener el envío si falta el nombre de transferencia
         }
-        
+
         // Continuar con el envío normal del formulario
         form.handleSubmit(onSubmit)(e);
       }} className="space-y-6">
@@ -215,8 +219,8 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
             )}
           />
         </div>
-
         {/* Row 2: Payment Date and Payment Type */}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
@@ -224,33 +228,69 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Fecha de Pago</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
-                        disabled={isLoading}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {field.value ? format(new Date(field.value), "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={field.value ? new Date(field.value) : undefined}
-                      onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                <div className="relative">
+                  <FormControl>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                      onClick={() => setIsPaymentDatePickerOpen(!isPaymentDatePickerOpen)}
                       disabled={isLoading}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {(() => {
+                        const dateString = field.value;
+                        if (dateString && dateString.trim() !== "") {
+                          const dateObj = new Date(`${dateString.split('T')[ 0 ]}T00:00:00`);
+                          if (!isNaN(dateObj.getTime())) {
+                            return format(dateObj, "PPP", { locale: es });
+                          }
+                        }
+                        // retornar fecha de hoy
+                        return format(new Date(), "PPP", { locale: es });
+                      })()}
+                    </Button>
+                  </FormControl>
+
+                  {isPaymentDatePickerOpen && (
+                    <div className="absolute left-0 z-50 mt-2 rounded-md border bg-popover p-0 shadow-md">
+                      <Calendar
+                        mode="single"
+                        selected={(() => {
+                          const dateString = field.value;
+                          if (dateString && dateString.trim() !== "") {
+                            const dateObj = new Date(`${dateString.split('T')[ 0 ]}T00:00:00`);
+                            if (!isNaN(dateObj.getTime())) {
+                              return dateObj;
+                            }
+                          }
+                          return undefined;
+                        })()}
+                        onSelect={(date) => {
+                          // Asegurarnos de que la fecha se mantenga en la zona horaria local
+                          const localDate = date ? new Date(Date.UTC(
+                            date.getFullYear(),
+                            date.getMonth(),
+                            date.getDate(),
+                            12, 0, 0
+                          )) : null;
+                          field.onChange(localDate ? format(localDate, 'yyyy-MM-dd') : '');
+                          setIsPaymentDatePickerOpen(false);
+                        }}
+                        disabled={(date) => date < new Date("1900-01-01")}
+                        initialFocus
+                        locale={es}
+                      />
+                    </div>
+                  )}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
+          {/* quiero hacer un con console.log el valor de field.value*/}
+          {/* {console.log(field.value)} */}
+
           <FormField
             control={form.control}
             name="paymentType"
@@ -264,11 +304,11 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {Object.values(PaymentTypeEnum.Enum).map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type.charAt(0) + type.slice(1).toLowerCase()} {/* Capitalize */}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value={PaymentTypeEnum.Enum.TRANSFER}>{getPaymentTypeLabel(PaymentTypeEnum.Enum.TRANSFER as any)}</SelectItem>
+                    <SelectItem value={PaymentTypeEnum.Enum.CASH}>{getPaymentTypeLabel(PaymentTypeEnum.Enum.CASH as any)}</SelectItem>
+                    <SelectItem value={PaymentTypeEnum.Enum.YAPE}>{getPaymentTypeLabel(PaymentTypeEnum.Enum.YAPE as any)}</SelectItem>
+                    <SelectItem value={PaymentTypeEnum.Enum.PLIN}>{getPaymentTypeLabel(PaymentTypeEnum.Enum.PLIN as any)}</SelectItem>
+                    <SelectItem value={PaymentTypeEnum.Enum.OTHER}>{getPaymentTypeLabel(PaymentTypeEnum.Enum.OTHER as any)}</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -281,33 +321,33 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
         {(watchedPaymentType === PaymentTypeEnum.Enum.TRANSFER ||
           watchedPaymentType === PaymentTypeEnum.Enum.YAPE ||
           watchedPaymentType === PaymentTypeEnum.Enum.PLIN) && (
-          <FormField
-            control={form.control}
-            name="transfername"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="flex items-center">
-                  Nombre/Referencia de {watchedPaymentType.charAt(0) + watchedPaymentType.slice(1).toLowerCase()}
-                  <span className="text-red-500 ml-1">*</span>
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder={
-                      watchedPaymentType === PaymentTypeEnum.Enum.TRANSFER
-                        ? "Ej: Nombre del titular de la cuenta"
-                        : "Ej: N° de Operación Yape/Plin"
-                    }
-                    {...field}
-                    value={field.value || ""}
-                    disabled={isLoading}
-                    required
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
+            <FormField
+              control={form.control}
+              name="transfername"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">
+                    Nombre/Referencia de {watchedPaymentType.charAt(0) + watchedPaymentType.slice(1).toLowerCase()}
+                    <span className="text-red-500 ml-1">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={
+                        watchedPaymentType === PaymentTypeEnum.Enum.TRANSFER
+                          ? "Ej: Nombre del titular de la cuenta"
+                          : "Ej: N° de Operación Yape/Plin"
+                      }
+                      {...field}
+                      value={field.value || ""}
+                      disabled={isLoading}
+                      required
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
 
         {/* Row 3: State and Reference */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -324,9 +364,9 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                     <SelectItem value={PaymentStatusEnum.Enum.PENDING}>Pendiente</SelectItem>
-                     <SelectItem value={PaymentStatusEnum.Enum.PAYMENT_DAILY}>Pagado</SelectItem>
-                     <SelectItem value={PaymentStatusEnum.Enum.LATE_PAYMENT}>Atrasado</SelectItem>
+                    <SelectItem value={PaymentStatusEnum.Enum.PENDING}>Pendiente</SelectItem>
+                    <SelectItem value={PaymentStatusEnum.Enum.PAYMENT_DAILY}>Pagado</SelectItem>
+                    <SelectItem value={PaymentStatusEnum.Enum.LATE_PAYMENT}>Atrasado</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -413,9 +453,9 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
 
         {/* Opción para cálculo automático del estado */}
         <div className="flex items-center space-x-2">
-          <Switch 
-            id="auto-calculate-state" 
-            checked={autoCalculateState} 
+          <Switch
+            id="auto-calculate-state"
+            checked={autoCalculateState}
             onCheckedChange={setAutoCalculateState}
             disabled={isLoading}
           />
@@ -454,7 +494,9 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
             Cancelar
           </Button>
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? (payment ? "Actualizando..." : "Guardando...") : (payment ? "Actualizar Pago" : "Guardar Pago")}
+            {isLoading
+              ? (payment && payment.id ? "Actualizando..." : "Guardando...")
+              : (payment && payment.id ? "Actualizar Pago" : "Guardar Pago")}
           </Button>
         </div>
       </form>

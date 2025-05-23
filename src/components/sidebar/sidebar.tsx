@@ -61,7 +61,7 @@ export function Sidebar({
     if (isMobile && isCollapsed) {
       onToggleCollapse()
     }
-  }, [isMobile, isCollapsed, onToggleCollapse])
+  }, [ isMobile, isCollapsed, onToggleCollapse ])
 
   const ability = useAbility();
 
@@ -83,6 +83,31 @@ export function Sidebar({
     canViewEntity
   ].some(Boolean);
 
+  const configPaths = [
+    "/configuration/plans",
+    "/configuration/services",
+    "/configuration/sectors",
+    // Agrega aquí más rutas hijas si las tienes
+  ];
+
+  const clientPaths = [
+    "/configuration/client",
+    "/configuration/payment",
+    // Agrega aquí más rutas hijas si las tienes
+  ];
+
+  // Ejemplo para otros menús padres:
+  const inventoryPaths = [
+    // "/inventory/items",
+    // "/inventory/categories",
+    // ...
+  ];
+  const entityPaths = [
+    // "/entity/list",
+    // "/entity/details",
+    // ...
+  ];
+
   return (
     <div className={cn(
       "flex flex-col h-full transition-colors duration-300",
@@ -95,14 +120,14 @@ export function Sidebar({
           {!isCollapsed && (
             <>
               {sidebarColor === "hemmy" ? (
-                <img src="/logos/logo_hemmy_white.jpg" alt="Logo Hemmy" className="w-32" />
+                <img src="/logos/hm_logo.png" alt="Logo Hemmy" className="w-32" />
               ) : (
                 <>
                   {colorScheme === "dark" ? (
                     <img src="/logos/logo_hemmy_white.jpg" alt="Logo Hemmy" className="w-32" />
                   ) : (
-                    <h1 className="text-2xl font-bold text-[#5E3583]">Grupo Hemmy &copy;</h1>
-                    // <img src="/logos/logo_hemmy_white.jpg" alt="Logo Hemmy" className="w-32" />
+                    // <h1 className="text-2xl font-bold text-[#5E3583]">Grupo Hemmy &copy;</h1>
+                    <img src="/logos/hm_logo.png" alt="Logo Hemmy" className="w-32" />
                   )}
                 </>
               )}
@@ -111,11 +136,11 @@ export function Sidebar({
           {isCollapsed && (
             <>
               {sidebarColor === "hemmy" ? (
-                <img src="/logos/logo_hemmy_white.jpg" alt="" className="w-[2.20rem]" />
+                <img src="/logos/hm_logo.png" alt="" className="w-[2.20rem]" />
               ) : colorScheme === "dark" ? (
-                <img src="/logos/logo_hemmy_white.jpg" alt="" className="w-[2.20rem]" />
+                <img src="/logos/hm_logo.png" alt="" className="w-[2.20rem]" />
               ) : (
-                <img src="/logos/logo_hemmy_white.jpg" alt="" className="w-[2.20rem]" />
+                <img src="/logos/hm_logo.png" alt="" className="w-[2.20rem]" />
               )}
             </>
           )}
@@ -157,7 +182,13 @@ export function Sidebar({
               )}
 
               <Can action="read" subject="Customer">
-                <SidebarMenuItem key="administration" icon={User} title="Clientes" isCollapsed={isCollapsed}>
+                <SidebarMenuItem
+                  key="administration"
+                  icon={User}
+                  title="Clientes"
+                  isCollapsed={isCollapsed}
+                  isActive={clientPaths.includes(pathname)}
+                >
                   <Can action="read" subject="Client">
                     <SidebarMenuItem
                       key="client"
@@ -181,7 +212,13 @@ export function Sidebar({
                 </SidebarMenuItem>
               </Can>
               <Can action="read" subject="Configuration">
-                <SidebarMenuItem key="configurartion" icon={Wallet} title="Configuración" isCollapsed={isCollapsed}>
+                <SidebarMenuItem
+                  key="configurartion"
+                  icon={Wallet}
+                  title="Configuración"
+                  isCollapsed={isCollapsed}
+                  isActive={configPaths.includes(pathname)}
+                >
                   <Can action="read" subject="Plan">
                     <SidebarMenuItem
                       key="plans"

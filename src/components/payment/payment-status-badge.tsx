@@ -1,3 +1,4 @@
+import { getPaymentStatusLabel } from "@/utils/payment-status-labels"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { PaymentStatus } from "@/types/payments/payment"
@@ -11,19 +12,19 @@ export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
     switch (status) {
       case "PAYMENT_DAILY":
         return {
-          label: "Pagado",
+          label: getPaymentStatusLabel(status),
           variant: "success" as const,
           className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
         }
       case "PENDING":
         return {
-          label: "Pendiente",
-          variant: "warning" as const,
+          label: getPaymentStatusLabel(status),
+          variant: "secondary" as const,
           className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
         }
       case "LATE_PAYMENT":
         return {
-          label: "Atrasado",
+          label: getPaymentStatusLabel(status),
           variant: "destructive" as const,
           className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
         }

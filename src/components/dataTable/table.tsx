@@ -42,9 +42,9 @@ export function GeneralTable<TData, TValue>({
     pageSize: initialPageSize = 10,
     currentPage = 1
 }: GeneralTableProps<TData, TValue>) {
-    const [pageSize, setPageSize] = useState(initialPageSize)
-    const [pageIndex, setPageIndex] = useState(currentPage - 1)
-    const [goToPage, setGoToPage] = useState(currentPage.toString())
+    const [ pageSize, setPageSize ] = useState(initialPageSize)
+    const [ pageIndex, setPageIndex ] = useState(currentPage - 1)
+    const [ goToPage, setGoToPage ] = useState(currentPage.toString())
 
     const table = useReactTable({
         data,
@@ -72,12 +72,12 @@ export function GeneralTable<TData, TValue>({
 
     useEffect(() => {
         table.setPageSize(initialPageSize)
-    }, [initialPageSize, table])
+    }, [ initialPageSize, table ])
 
     useEffect(() => {
         setPageIndex(currentPage - 1)
         setGoToPage(currentPage.toString())
-    }, [currentPage])
+    }, [ currentPage ])
 
     const handleGoToPage = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter") {
@@ -92,7 +92,7 @@ export function GeneralTable<TData, TValue>({
 
     useEffect(() => {
         setGoToPage((pageIndex + 1).toString())
-    }, [pageIndex])
+    }, [ pageIndex ])
 
     const renderPageButtons = () => {
         const totalPages = table.getPageCount()
@@ -159,31 +159,31 @@ export function GeneralTable<TData, TValue>({
                 <Table
                     className={cn(
                         "overflow-hidden rounded-md",
-                        "bg-white dark:bg-gray-800 border dark:border-gray-700",
+                        "bg-white dark:bg-[#2D1843] border border-[#5E3583] dark:border-[#5E3583]",
                         className,
                     )}
                 >
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id} className="bg-gray-100 dark:bg-gray-900">
+                            <TableRow key={headerGroup.id} className="bg-[#5E3583]/15 dark:bg-[#5E3583] hover:bg-[#5E3583]/10">
                                 {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id} className="text-primary dark:text-gray-300 font-bold text-xs h-12 p-0">
+                                    <TableHead key={header.id} className="text-[#5E3583] dark:text-purple-100 font-bold text-xs h-12 p-0 border-b border-[#5E3583]/10 dark:border-purple-700 ">
                                         {header.isPlaceholder ? null : (
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
                                                 className={cn(
-                                                    "bg-transparent select-none w-full hover:bg-gray-200 dark:hover:bg-gray-800",
-                                                    "hover:text-primary dark:hover:text-white",
-                                                    header.column.getIsSorted() && "bg-primary/10 dark:bg-primary/20",
+                                                    "select-none w-full dark:hover:bg-[#3D2566] hover:bg-[#5E3583]/10",
+                                                    "hover:text-[#5E3583] dark:hover:text-white",
+                                                    header.column.getIsSorted() && "bg-[#5E3583]/10 dark:bg-[#5E3583]/20",
                                                 )}
                                                 onClick={header.column.getToggleSortingHandler()}
                                             >
                                                 {flexRender(header.column.columnDef.header, header.getContext())}
                                                 {{
-                                                    asc: <GoSortAsc className="ml-1 w-4 h-4 shrink-0" />,
-                                                    desc: <GoSortDesc className="ml-1 w-4 h-4 shrink-0" />,
-                                                }[header.column.getIsSorted() as string] ?? null}
+                                                    asc: <GoSortAsc className="ml-1 w-4 h-4 shrink-0 text-[#5E3583] dark:text-purple-200" />,
+                                                    desc: <GoSortDesc className="ml-1 w-4 h-4 shrink-0 text-[#5E3583] dark:text-purple-200" />,
+                                                }[ header.column.getIsSorted() as string ] ?? null}
                                             </Button>
                                         )}
                                     </TableHead>
@@ -193,11 +193,11 @@ export function GeneralTable<TData, TValue>({
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            [...Array(5)].map((_, index) => (
-                                <TableRow key={`row-${index}`} className="dark:bg-[#252526]">
-                                    {[...Array(table.getAllColumns().length)].map((_, cellIndex) => (
-                                        <TableCell key={`cell-${cellIndex}`} className="dark:border-gray-700">
-                                            <Skeleton className="h-14" />
+                            [ ...Array(5) ].map((_, index) => (
+                                <TableRow key={`row-${index}`} className="dark:bg-[#5E3583] bg-[#F5F0FA]">
+                                    {[ ...Array(table.getAllColumns().length) ].map((_, cellIndex) => (
+                                        <TableCell key={`cell-${cellIndex}`} className="border-b border-[#5E3583]/10 dark:border-purple-900">
+                                            <Skeleton className="h-14 bg-[#E9E1F7] dark:bg-[#3D2566]" />
                                         </TableCell>
                                     ))}
                                 </TableRow>
@@ -207,10 +207,10 @@ export function GeneralTable<TData, TValue>({
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    className="hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-700"
+                                    className="hover:bg-[#5E3583]/10 dark:hover:bg-[#3D2566] dark:border-[#5E3583]"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className="text-gray-800 dark:text-gray-300 dark:border-gray-700">
+                                        <TableCell key={cell.id} className="text-[#2D1843] dark:text-purple-100 border-b border-[#5E3583]/10 dark:border-purple-700">
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
@@ -220,7 +220,7 @@ export function GeneralTable<TData, TValue>({
                             <TableRow>
                                 <TableCell
                                     colSpan={table.getAllColumns().length}
-                                    className="h-24 text-center text-primary dark:text-gray-300 bg-gray-200 dark:bg-gray-900 p-12"
+                                    className="h-24 text-center text-[#5E3583] dark:text-purple-200 bg-[#E9E1F7] dark:bg-[#5E3583] p-12"
                                 >
                                     No hay resultados.
                                 </TableCell>
@@ -243,7 +243,7 @@ export function GeneralTable<TData, TValue>({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent side="top">
-                                    {[5, 10, 20, 50].map((size) => (
+                                    {[ 5, 10, 20, 50 ].map((size) => (
                                         <SelectItem key={size} value={`${size}`}>
                                             {size}
                                         </SelectItem>
@@ -269,7 +269,7 @@ export function GeneralTable<TData, TValue>({
                             value={goToPage}
                             onChange={(e) => setGoToPage(e.target.value)}
                             onKeyDown={handleGoToPage}
-                            className="h-8 w-[70px]"
+                            className="h-8 w-[70px] bg-[#5E3583]/10 dark:bg-[#5E3583] text-[#5E3583] dark:text-purple-100"
                         />
                     </div>
                 </div>

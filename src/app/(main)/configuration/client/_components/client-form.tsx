@@ -26,6 +26,7 @@ import { format } from "date-fns"
 import { es } from 'date-fns/locale'
 import { useServices } from "@/hooks/use-service"
 import { Service } from "@/types/services/service"
+import { getAccountStatusLabel } from "@/utils/account-status-labels"
 
 export interface ClientFormProps {
     client?: Client | null;
@@ -35,14 +36,14 @@ export interface ClientFormProps {
 }
 
 export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientFormProps) {
-    const [isMounted, setIsMounted] = useState(false)
-    const [step, setStep] = useState(1)
+    const [ isMounted, setIsMounted ] = useState(false)
+    const [ step, setStep ] = useState(1)
 
     const { plans, refreshPlans } = usePlans()
     const { sectors, refreshSector } = useSectors()
     const { services, refreshService } = useServices()
 
-    const [selectedServiceId, setSelectedServiceId] = useState<number | undefined>(
+    const [ selectedServiceId, setSelectedServiceId ] = useState<number | undefined>(
         client?.plan?.service?.id
     )
 
@@ -138,12 +139,12 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
             })
         }
         setStep(1)
-    }, [client])
+    }, [ client ])
 
     const filteredPlans = React.useMemo(() => {
         if (!selectedServiceId) return [];
         return plans.filter(plan => plan.service?.id === selectedServiceId);
-    }, [plans, selectedServiceId]);
+    }, [ plans, selectedServiceId ]);
 
     if (!isMounted) {
         return null
@@ -303,7 +304,7 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                                     <PopoverTrigger asChild>
                                         <FormControl>
                                             <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                {field.value ? format(new Date(`${field.value}T00:00:00`), "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                                                {field.value ? format(new Date(`${field.value}T12:00:00Z`), "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
                                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                             </Button>
                                         </FormControl>
@@ -311,8 +312,16 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                                     <PopoverContent className="w-auto p-0" align="start">
                                         <Calendar
                                             mode="single"
-                                            selected={field.value ? new Date(`${field.value}T00:00:00`) : undefined}
-                                            onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
+                                            selected={field.value ? new Date(`${field.value}T12:00:00Z`) : undefined}
+                                            onSelect={(date) => {
+                                                const localDate = date ? new Date(Date.UTC(
+                                                    date.getFullYear(),
+                                                    date.getMonth(),
+                                                    date.getDate(),
+                                                    12, 0, 0
+                                                )) : null;
+                                                field.onChange(localDate ? format(localDate, 'yyyy-MM-dd') : '');
+                                            }}
                                             disabled={(date) => date < new Date("1900-01-01")}
                                             initialFocus
                                             locale={es}
@@ -328,7 +337,9 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Seleccione estado" /></SelectTrigger></FormControl>
                                     <SelectContent>
-                                        {AccountStatusEnum.options.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                                        {AccountStatusEnum.options.map((status) => (
+                                            <SelectItem key={status} value={status}>{getAccountStatusLabel(status)}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />

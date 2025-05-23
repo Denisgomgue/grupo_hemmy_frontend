@@ -18,6 +18,14 @@ import { baseColumns } from "./_components/columns";
 import { ClientActionsDropdown } from "./_components/client-actions-dropdown";
 import { ClientCard } from "./_components/client-card";
 import { ColumnDef } from '@tanstack/react-table';
+import { PaginatedCards } from "@/components/dataTable/paginated-cards"
+import { ViewModeSwitcher } from "@/components/dataTable/view-mode-switcher"
+import { InfoSummaryCards } from "@/components/info-summary-cards"
+import { Users, UserCheck, UserPlus, UserX } from "lucide-react"
+import { useEffect, useState } from "react"
+import { TableToolbar } from "@/components/dataTable/table-toolbar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 
 export default function ClientPage() {
     const queryClient = useQueryClient();
@@ -27,6 +35,8 @@ export default function ClientPage() {
     const [ currentPage, setCurrentPage ] = React.useState(1);
     const [ pageSize, setPageSize ] = React.useState(10);
     const [ totalRecords, setTotalRecords ] = React.useState(0);
+    const [ viewMode, setViewMode ] = React.useState<"list" | "grid">("list")
+    const [ searchTerm, setSearchTerm ] = useState("")
 
     const { refreshClient } = useClient();
 
@@ -162,6 +172,42 @@ export default function ClientPage() {
     const isLoadingMutation = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
     const isFetchingOrMutating = clientsQuery.isFetching || isLoadingMutation;
 
+    // Animación de conteo para los valores de los cards
+    const [ activeClients, setActiveClients ] = useState(0)
+    const [ newClients, setNewClients ] = useState(0)
+    const [ inactiveClients, setInactiveClients ] = useState(0)
+    const [ totalClients, setTotalClients ] = useState(0)
+
+    React.useEffect(() => {
+        // Simular valores finales (puedes reemplazar por datos reales)
+        const finalActive = 120
+        const finalNew = 8
+        const finalInactive = 5
+        const finalTotal = 133
+        // Animar conteo
+        let a = 0, n = 0, i = 0, t = 0
+        const steps = 30
+        const duration = 600
+        const interval = setInterval(() => {
+            a = Math.min(finalActive, a + Math.ceil(finalActive / steps))
+            n = Math.min(finalNew, n + Math.ceil(finalNew / steps))
+            i = Math.min(finalInactive, i + Math.ceil(finalInactive / steps))
+            t = Math.min(finalTotal, t + Math.ceil(finalTotal / steps))
+            setActiveClients(a)
+            setNewClients(n)
+            setInactiveClients(i)
+            setTotalClients(t)
+            if (a === finalActive && n === finalNew && i === finalInactive && t === finalTotal) clearInterval(interval)
+        }, duration / steps)
+        return () => clearInterval(interval)
+    }, [])
+
+    // Manejador de búsqueda
+    const handleSearch = () => {
+        // Aquí puedes recargar los datos usando searchTerm
+        clientsQuery.refetch()
+    }
+
     return (
         <MainContainer>
             <HeaderActions title="Gestión de Clientes">
@@ -169,21 +215,100 @@ export default function ClientPage() {
                 <AddButton onClick={handleAdd} text="Agregar Cliente" />
             </HeaderActions>
 
-            <ResponsiveTable<Client>
-                data={clientsQuery.data?.data ?? []}
-                columns={clientColumns}
-                headers={[]}
-                renderCard={(client) => (
-                    <ClientCard client={client} onEdit={handleEdit} />
-                )}
-                isLoading={isFetchingOrMutating}
-                pagination={{
-                    onPaginationChange: handlePaginationChange,
-                    totalRecords: totalRecords,
-                    pageSize: pageSize,
-                    currentPage: currentPage
-                }}
+            {/* Cards informativos con animación */}
+            <InfoSummaryCards
+                cards={[
+                    {
+                        title: "Clientes Activos",
+                        value: activeClients,
+                        description: "Actualmente activos",
+                        icon: <UserCheck className="h-8 w-8 text-green-500" />,
+                        borderColor: "border-l-green-500"
+                    },
+                    {
+                        title: "Clientes Nuevos",
+                        value: newClients,
+                        description: "Este mes",
+                        icon: <UserPlus className="h-8 w-8 text-blue-500" />,
+                        borderColor: "border-l-blue-500"
+                    },
+                    {
+                        title: "Clientes Inactivos",
+                        value: inactiveClients,
+                        description: "Actualmente inactivos",
+                        icon: <UserX className="h-8 w-8 text-red-500" />,
+                        borderColor: "border-l-red-500"
+                    },
+                    {
+                        title: "Total Clientes",
+                        value: totalClients,
+                        description: "En el sistema",
+                        icon: <Users className="h-8 w-8 text-purple-500" />,
+                        borderColor: "border-l-purple-500"
+                    }
+                ]}
             />
+
+            {/* Selector de vista */}
+            <div className="flex items-center justify-between">
+                <TableToolbar
+                    value={searchTerm}
+                    onValueChange={setSearchTerm}
+                    onSearch={handleSearch}
+                    searchPlaceholder="Buscar clientes..."
+                    filters={
+                        <Select defaultValue="active">
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Filtrar por estado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="active">Activos</SelectItem>
+                                <SelectItem value="inactive">Inactivos</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    }
+                    actions={
+                        <>
+                            <Button variant="outline">Exportar</Button>
+                            <Button variant="outline">Importar</Button>
+                        </>
+                    }
+                />
+                <ViewModeSwitcher viewMode={viewMode} setViewMode={(mode) => setViewMode(mode as "list" | "grid")} />
+            </div>
+
+            {/* Barra de búsqueda, filtros y acciones */}
+
+
+            {viewMode === "list" ? (
+                <ResponsiveTable<Client>
+                    data={clientsQuery.data?.data ?? []}
+                    columns={clientColumns}
+                    headers={[]}
+                    isLoading={isFetchingOrMutating}
+                    pagination={{
+                        onPaginationChange: handlePaginationChange,
+                        totalRecords: totalRecords,
+                        pageSize: pageSize,
+                        currentPage: currentPage
+                    }}
+                />
+            ) : (
+                <PaginatedCards
+                    data={clientsQuery.data?.data ?? []}
+                    totalRecords={totalRecords}
+                    pageSize={pageSize}
+                    onPaginationChange={handlePaginationChange}
+                    renderCard={(client) => (
+                        <ClientCard
+                            key={client.id}
+                            client={client}
+                            onEdit={handleEdit}
+                        />
+                    )}
+                    isLoading={isFetchingOrMutating}
+                />
+            )}
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen} modal={false}>
                 <DialogContent

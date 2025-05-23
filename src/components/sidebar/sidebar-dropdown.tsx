@@ -1,6 +1,6 @@
 "use client"
 
-import type * as React from "react"
+import React from "react"
 import Link from "next/link"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
@@ -22,9 +22,20 @@ interface SidebarDropdownProps {
 }
 
 export function SidebarDropdown({ trigger, items, open, onOpenChange }: SidebarDropdownProps) {
+    // Detectar si algún hijo está activo
+    const hasActiveChild = items.some(item => item.isActive)
+    // Clonar el trigger y matizar si algún hijo está activo
+    let triggerWithMatiz = trigger
+    if (React.isValidElement(trigger)) {
+        const element = trigger as React.ReactElement<any, any>
+        const className = element.props.className ?? ""
+        triggerWithMatiz = React.cloneElement(element, {
+            className: cn(className, hasActiveChild && "bg-[#7D51A8] text-white")
+        })
+    }
     return (
         <Popover open={open} onOpenChange={onOpenChange}>
-            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <PopoverTrigger asChild>{triggerWithMatiz}</PopoverTrigger>
             <PopoverContent
                 side="right"
                 sideOffset={20}
@@ -45,8 +56,8 @@ export function SidebarDropdown({ trigger, items, open, onOpenChange }: SidebarD
                                             variant="ghost"
                                             asChild
                                             className={cn(
-                                                "w-full justify-start hover:bg-[#5E3583]",
-                                                item.isActive && "bg-[#5E3583] text-accent-foreground",
+                                                "w-full justify-start hover:bg-[#5E3583] hover:text-white",
+                                                item.isActive && "bg-[#5E3583] text-white",
                                             )}
                                         >
                                             <Link href={item.href} className="flex items-center w-full px-2 py-1.5">

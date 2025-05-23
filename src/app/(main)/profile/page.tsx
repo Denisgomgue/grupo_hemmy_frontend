@@ -146,7 +146,7 @@ export default function ProfilePage() {
             <Avatar className="h-20 w-20">
               {user && user.name ? (
                 <AvatarImage
-                  src={`https://ui-avatars.com/api/?name=${user.name}+${user.surname}&background=random`}
+                  src={`https://ui-avatars.com/api/?name=${user.name}+${user.surname}&background=purple&color=white`}
                   alt={`${user.name} ${user.surname}`}
                 />
               ) : (

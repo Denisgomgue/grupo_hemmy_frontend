@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Edit, CreditCard, Ticket, MapPin } from "lucide-react"
+import { ArrowLeft, Edit, CreditCard, Ticket, MapPin, User as UserIcon } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -16,61 +16,66 @@ import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/axios"
 import { type Client, AccountStatus, PaymentStatus as ClientPaymentStatus } from "@/types/clients/client"
 import { type Payment, PaymentStatus, PaymentType } from "@/types/payments/payment"
+import { getPaymentStatusLabel } from "@/utils/payment-status-labels"
+import { Dialog, DialogTrigger, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { PaymentForm } from "@/app/(main)/configuration/payment/_components/payment-form"
+import { getAccountStatusLabel } from "@/utils/account-status-labels"
+import { getClientPaymentStatusLabel } from "@/utils/client-payment-status-labels"
+import { PaymentDetailModal } from "@/components/payment/payment-detail-modal"
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { toast } = useToast()
-  const [client, setClient] = useState<Client | null>(null)
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isPaymentsLoading, setIsPaymentsLoading] = useState(true)
+  const [ client, setClient ] = useState<Client | null>(null)
+  const [ payments, setPayments ] = useState<Payment[]>([])
+  const [ isLoading, setIsLoading ] = useState(true)
+  const [ isPaymentsLoading, setIsPaymentsLoading ] = useState(true)
+  const [ isPaymentModalOpen, setIsPaymentModalOpen ] = useState(false)
+  const [ selectedPayment, setSelectedPayment ] = useState<Payment | null>(null)
+  const [ isPaymentDetailModalOpen, setIsPaymentDetailModalOpen ] = useState(false)
+
+  const fetchClientPayments = async () => {
+    if (!id) return
+    try {
+      setIsPaymentsLoading(true)
+      const response = await api.get(`/payments?client=${id}`)
+      setPayments(Array.isArray(response.data) ? response.data : [])
+    } catch (error) {
+      console.error("Error fetching client payments:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los pagos del cliente",
+        variant: "destructive",
+      })
+      setPayments([])
+    } finally {
+      setIsPaymentsLoading(false)
+    }
+  }
+
+  const fetchClientData = async () => {
+    if (!id) return
+    try {
+      setIsLoading(true)
+      const response = await api.get(`/client/${id}`)
+      setClient(response.data)
+    } catch (error) {
+      console.error("Error fetching client data:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la información del cliente",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchClientData = async () => {
-      if (!id) return
-      
-      try {
-        setIsLoading(true)
-        // Obtener datos del cliente
-        const response = await api.get(`/client/${id}`)
-        setClient(response.data)
-      } catch (error) {
-        console.error("Error fetching client data:", error)
-        toast({
-          title: "Error",
-          description: "No se pudo cargar la información del cliente",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    const fetchClientPayments = async () => {
-      if (!id) return
-      
-      try {
-        setIsPaymentsLoading(true)
-        // Obtener los pagos del cliente
-        const response = await api.get(`/payments?client=${id}`)
-        setPayments(Array.isArray(response.data) ? response.data : [])
-      } catch (error) {
-        console.error("Error fetching client payments:", error)
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los pagos del cliente",
-          variant: "destructive",
-        })
-        setPayments([])
-      } finally {
-        setIsPaymentsLoading(false)
-      }
-    }
-
     fetchClientData()
     fetchClientPayments()
-  }, [id, toast])
+  }, [ id, toast ])
 
   const handleBack = () => {
     router.back()
@@ -86,10 +91,40 @@ export default function ClientDetailPage() {
     router.push(`/configuration/payment?client=${id}`)
   }
 
-  const getStatusVariant = (status: AccountStatus): "success" | "secondary" | "destructive" | "outline" => {
+  // Handler para abrir el modal de pago
+  const handleOpenPaymentModal = () => setIsPaymentModalOpen(true)
+  const handleClosePaymentModal = () => setIsPaymentModalOpen(false)
+
+  // Handler para registrar el pago (puedes agregar lógica de recarga de pagos aquí)
+  const handlePaymentSubmit = async (data: any) => {
+    try {
+      await api.post('/payments', data)
+      setIsPaymentModalOpen(false)
+      await fetchClientPayments()
+      await fetchClientData()
+      toast({
+        title: "Pago registrado",
+        description: "El pago se guardó correctamente.",
+        variant: "default",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo registrar el pago.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handlePaymentClick = (payment: Payment) => {
+    setSelectedPayment(payment)
+    setIsPaymentDetailModalOpen(true)
+  }
+
+  const getStatusVariant = (status: AccountStatus): "accountSuccess" | "secondary" | "destructive" | "outline" => {
     switch (status) {
       case AccountStatus.ACTIVE:
-        return "success"
+        return "accountSuccess"
       case AccountStatus.SUSPENDED:
         return "secondary"
       case AccountStatus.INACTIVE:
@@ -128,16 +163,7 @@ export default function ClientDetailPage() {
   }
 
   const getPaymentStateText = (state: PaymentStatus): string => {
-    switch (state) {
-      case PaymentStatus.PAYMENT_DAILY:
-        return "Pagado"
-      case PaymentStatus.PENDING:
-        return "Pendiente"
-      case PaymentStatus.LATE_PAYMENT:
-        return "Atrasado"
-      default:
-        return "Desconocido"
-    }
+    return getPaymentStatusLabel(state)
   }
 
   const getPaymentTypeText = (type: PaymentType): string => {
@@ -175,7 +201,7 @@ export default function ClientDetailPage() {
     )
   }
 
-  const initial = client.name ? client.name[0].toUpperCase() : "?"
+  const initial = client.name ? client.name[ 0 ].toUpperCase() : "?"
 
   return (
     <div className="container mx-auto p-4">
@@ -191,12 +217,14 @@ export default function ClientDetailPage() {
         {/* Personal Information Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xl">Información Personal</CardTitle>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <UserIcon className="h-5 w-5 text-muted-foreground" /> Información Personal
+            </CardTitle>
             <Button variant="ghost" size="icon" onClick={handleEdit}>
               <Edit className="h-4 w-4" />
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <div className="flex items-start gap-4 mb-6">
               <Avatar className="h-16 w-16 text-2xl">
                 <AvatarFallback>{initial}</AvatarFallback>
@@ -217,8 +245,12 @@ export default function ClientDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Estado</p>
                 <div className="flex items-center gap-2">
-                  <Badge variant={getStatusVariant(client.status)}>{client.status}</Badge>
-                  <Badge variant={getPaymentStatusVariant(client.paymentStatus)}>{client.paymentStatus}</Badge>
+                  <Badge variant={getStatusVariant(client.status)}>
+                    {getAccountStatusLabel(client.status)}
+                  </Badge>
+                  <Badge variant={getPaymentStatusVariant(client.paymentStatus)}>
+                    {getClientPaymentStatusLabel(client.paymentStatus)}
+                  </Badge>
                 </div>
               </div>
               <div className="col-span-2">
@@ -240,12 +272,14 @@ export default function ClientDetailPage() {
         {/* Service Information Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xl">Información del Servicio</CardTitle>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-muted-foreground" /> Información del Servicio
+            </CardTitle>
             <Button variant="ghost" size="icon" onClick={handleEdit}>
               <Edit className="h-4 w-4" />
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
                 <p className="text-sm text-muted-foreground">Tipo de Servicio</p>
@@ -279,9 +313,25 @@ export default function ClientDetailPage() {
               </div>
             </div>
 
-            <Button className="w-full" onClick={handleRegisterPayment}>
-              <CreditCard className="mr-2 h-4 w-4" /> Registrar Pago
-            </Button>
+            <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full" onClick={handleOpenPaymentModal}>
+                  <CreditCard className="mr-2 h-4 w-4" /> Registrar Pago
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogTitle>Registrar Pago</DialogTitle>
+                <PaymentForm
+                  onSubmit={handlePaymentSubmit}
+                  onCancel={handleClosePaymentModal}
+                  isLoading={false}
+                  payment={{
+                    client: { id: client.id },
+                    amount: client.plan?.price || 0,
+                  } as any}
+                />
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       </div>
@@ -329,16 +379,20 @@ export default function ClientDetailPage() {
                   </TableRow>
                 ) : payments.length > 0 ? (
                   payments.map((payment) => (
-                    <TableRow key={payment.id}>
+                    <TableRow
+                      key={payment.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handlePaymentClick(payment)}
+                    >
                       <TableCell className="font-medium">PAG-{payment.id.toString().padStart(4, '0')}</TableCell>
                       <TableCell>
-                        {payment.paymentDate 
-                          ? format(new Date(payment.paymentDate), "dd/MM/yyyy", { locale: es }) 
+                        {payment.paymentDate
+                          ? format(new Date(payment.paymentDate), "dd/MM/yyyy", { locale: es })
                           : "Pendiente"}
                       </TableCell>
                       <TableCell>
-                        {payment.dueDate 
-                          ? format(new Date(payment.dueDate), "dd/MM/yyyy", { locale: es }) 
+                        {payment.dueDate
+                          ? format(new Date(payment.dueDate), "dd/MM/yyyy", { locale: es })
                           : "N/A"}
                       </TableCell>
                       <TableCell>S/ {Number(payment.amount).toFixed(2)}</TableCell>
@@ -373,6 +427,12 @@ export default function ClientDetailPage() {
           <p className="text-muted-foreground">Esta funcionalidad estará disponible próximamente.</p>
         </TabsContent>
       </Tabs>
+
+      <PaymentDetailModal
+        payment={selectedPayment}
+        isOpen={isPaymentDetailModalOpen}
+        onClose={() => setIsPaymentDetailModalOpen(false)}
+      />
     </div>
   )
 }
@@ -402,7 +462,7 @@ function ClientDetailSkeleton() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              {[...Array(6)].map((_, i) => (
+              {[ ...Array(6) ].map((_, i) => (
                 <div key={i} className={i >= 4 ? "col-span-2" : ""}>
                   <Skeleton className="h-4 w-20 mb-2" />
                   <Skeleton className="h-6 w-full" />
@@ -419,7 +479,7 @@ function ClientDetailSkeleton() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 mb-6">
-              {[...Array(6)].map((_, i) => (
+              {[ ...Array(6) ].map((_, i) => (
                 <div key={i}>
                   <Skeleton className="h-4 w-20 mb-2" />
                   <Skeleton className="h-6 w-full" />
