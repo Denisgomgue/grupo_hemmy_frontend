@@ -7,10 +7,21 @@ export default function Page() {
   return (
     <div className="container mx-auto p-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <ChartLine />
+        {/* genere cista general */}
+        <div className="bg-white p-4 rounded-lg shadow-md">
+          <h2 className="text-lg font-bold">Cista general</h2>
+          <p className="text-sm text-gray-500">
+            Cista general
+            <div className="flex items-center justify-between">
+              <span className="text-2xl font-bold">100</span>
+              <span className="text-sm text-gray-500"> €</span>
+            </div>
+          </p>
+        </div>
+        {/* <ChartLine />
         <ChartBar />
         <ChartArea />
-        <ChartPie />
+        <ChartPie /> */}
       </div>
     </div>
   )

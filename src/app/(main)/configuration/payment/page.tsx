@@ -284,7 +284,7 @@ export default function PaymentPage() {
 
       {/* Payment Form Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedPayment ? "Editar" : "Crear"} Pago</DialogTitle>
           </DialogHeader>
