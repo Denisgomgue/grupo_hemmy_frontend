@@ -319,9 +319,9 @@ export default function ClientDetailPage() {
                   <CreditCard className="mr-2 h-4 w-4" /> Registrar Pago
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="w-full max-w-2xl">
                 <DialogTitle>Registrar Pago</DialogTitle>
-                <PaymentForm
+                <PaymentForm 
                   onSubmit={handlePaymentSubmit}
                   onCancel={handleClosePaymentModal}
                   isLoading={false}
@@ -329,6 +329,7 @@ export default function ClientDetailPage() {
                     client: { id: client.id },
                     amount: client.plan?.price || 0,
                   } as any}
+                  
                 />
               </DialogContent>
             </Dialog>

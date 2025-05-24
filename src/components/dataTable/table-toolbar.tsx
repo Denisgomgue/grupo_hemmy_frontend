@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input"
+import { Search } from "lucide-react"
 import { ReactNode } from "react"
 
 interface TableToolbarProps {
@@ -28,10 +29,11 @@ export function TableToolbar({
                 className="w-full md:w-auto"
             >
                 <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                         type="search"
                         placeholder={searchPlaceholder}
-                        className="w-full md:w-[300px] pl-8"
+                        className="w-full md:w-[300px] pl-9 border-input bg-background hover:bg-accent/10 focus-visible:ring-purple-800 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:border-purple-900"
                         value={value}
                         onChange={e => onValueChange?.(e.target.value)}
                     />

@@ -24,10 +24,11 @@ import { Button } from "@/components/ui/button"
 import { LayoutGrid, List, Search } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ColumnDef } from "@tanstack/react-table"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { PaginatedCards } from "@/components/dataTable/paginated-cards"
 import { ViewModeSwitcher } from "@/components/dataTable/view-mode-switcher"
 import { TableToolbar } from "@/components/dataTable/table-toolbar"
+import { useDebounce } from "@/hooks/use-debounce"
 
 export default function PaymentPage() {
   const queryClient = useQueryClient()
@@ -39,6 +40,7 @@ export default function PaymentPage() {
   const [ totalRecords, setTotalRecords ] = useState(0)
   const [ currentFilter, setCurrentFilter ] = useState("ALL")
   const [ searchTerm, setSearchTerm ] = useState("")
+  const [ localSearchTerm, setLocalSearchTerm ] = useState("")
   const [ viewMode, setViewMode ] = useState<"list" | "grid">("list")
   const [ paymentSummary, setPaymentSummary ] = useState({
     totalRecaudado: 0,
@@ -49,6 +51,7 @@ export default function PaymentPage() {
   })
   const [ isLoading, setIsLoading ] = useState(false)
   const [ isSubmitting, setIsSubmitting ] = useState(false)
+  const debouncedSearchTerm = useDebounce(searchTerm, 700)
 
   const {
     refreshPayments,
@@ -58,6 +61,30 @@ export default function PaymentPage() {
     deletePayment,
     getPaymentSummary
   } = usePayments()
+
+  // Filtrado local de pagos
+  const filteredPayments = useMemo(() => {
+    if (!localSearchTerm) return payments;
+
+    return payments.filter(payment => {
+      const searchTermLower = localSearchTerm.toLowerCase();
+      return (
+        payment.client.name.toLowerCase().includes(searchTermLower) ||
+        payment.client.lastName.toLowerCase().includes(searchTermLower) ||
+        payment.client.dni.toLowerCase().includes(searchTermLower) ||
+        payment.reference?.toLowerCase().includes(searchTermLower) ||
+        payment.amount.toString().includes(searchTermLower) ||
+        payment.paymentType.toLowerCase().includes(searchTermLower)
+      );
+    });
+  }, [ payments, localSearchTerm ]);
+
+  // Efecto para búsqueda en backend cuando sea necesario
+  useEffect(() => {
+    if (debouncedSearchTerm !== localSearchTerm) {
+      loadPayments();
+    }
+  }, [ debouncedSearchTerm ]);
 
   // Cargar pagos
   const loadPayments = async () => {
@@ -170,9 +197,15 @@ export default function PaymentPage() {
     setCurrentPage(1)
   }
 
-  const handleSearch = () => {
-    loadPayments()
-  }
+  const handleSearch = (value: string) => {
+    setLocalSearchTerm(value);
+    // Si hay más de 5 caracteres, activamos la búsqueda en backend
+    if (value.length > 8) {
+      setSearchTerm(value);
+    } else {
+      setSearchTerm("");
+    }
+  };
 
   const handleSetViewMode = (mode: string) => {
     if (mode === "list" || mode === "grid") setViewMode(mode)
@@ -223,10 +256,9 @@ export default function PaymentPage() {
       {/* Search and View Controls */}
       <div className="flex items-center justify-between mb-6">
         <TableToolbar
-          value={searchTerm}
-          onValueChange={setSearchTerm}
-          onSearch={handleSearch}
-          searchPlaceholder="Buscar pagos..."
+          value={localSearchTerm}
+          onValueChange={handleSearch}
+          searchPlaceholder="Buscar por cliente, DNI, monto..."
           filters={
             <Select defaultValue="recent">
               <SelectTrigger className="w-[180px]">
@@ -255,7 +287,7 @@ export default function PaymentPage() {
         <ResponsiveTable
           headers={headers}
           columns={paymentColumns}
-          data={payments}
+          data={filteredPayments}
           isLoading={isLoading}
           pagination={{
             currentPage,
@@ -266,7 +298,7 @@ export default function PaymentPage() {
         />
       ) : (
         <PaginatedCards
-          data={payments}
+          data={filteredPayments}
           totalRecords={totalRecords}
           pageSize={pageSize}
           onPaginationChange={handlePaginationChange}

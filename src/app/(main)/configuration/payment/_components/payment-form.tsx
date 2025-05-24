@@ -159,7 +159,7 @@ export function PaymentForm({ payment, onSubmit, isLoading = false, onCancel }: 
 
         // Continuar con el envío normal del formulario
         form.handleSubmit(onSubmit)(e);
-      }} className="space-y-6">
+      }} className="space-y-6 overflow-y-auto max-h-[calc(60vh-10rem)] pr-4">
         {/* Row 1: Client and Amount */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField

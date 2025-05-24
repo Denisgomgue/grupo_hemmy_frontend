@@ -6,6 +6,9 @@ import type { ColumnDef } from "@tanstack/react-table"
 import type { Payment, PaymentType } from "@/types/payments/payment"
 import { PaymentStatusBadge } from "@/components/payment/payment-status-badge"
 import { PaymentMethodIcon } from "@/components/payment/payment-method-icon"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { ExternalLink } from "lucide-react"
 
 export const baseColumns: ColumnDef<Payment>[] = [
   {
@@ -14,12 +17,24 @@ export const baseColumns: ColumnDef<Payment>[] = [
     cell: ({ row }) => {
       const client = row.original.client
       return (
-        <div>
-          <div className="font-medium">
-            {client.name} {client.lastName}
-          </div>
-          <div className="text-sm text-muted-foreground">{client.dni}</div>
-        </div>
+        <Button
+          variant="ghost"
+          className="p-0 h-auto hover:bg-transparent"
+          asChild
+        >
+          <Link
+            href={`/configuration/client/${client.id}`}
+            className="flex items-start text-left hover:text-purple-800"
+          >
+            <div>
+              <div className="font-medium flex items-center justify-between w-full gap-2">
+                {client.name} {client.lastName}
+                <ExternalLink className="h-3 w-3 opacity-50" />
+              </div>
+              <div className="text-sm text-muted-foreground">{client.dni}</div>
+            </div>
+          </Link>
+        </Button>
       )
     },
   },
@@ -57,7 +72,7 @@ export const baseColumns: ColumnDef<Payment>[] = [
       return (
         <div className="flex items-center gap-2">
           <PaymentMethodIcon method={paymentType as PaymentType} className="h-4 w-4" />
-          <span>{methodLabels[paymentType] || paymentType}</span>
+          <span>{methodLabels[ paymentType ] || paymentType}</span>
         </div>
       )
     },
