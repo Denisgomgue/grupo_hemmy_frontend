@@ -167,24 +167,29 @@ export function GeneralTable<TData, TValue>({
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id} className="bg-[#5E3583]/15 dark:bg-[#5E3583] hover:bg-[#5E3583]/10">
                                 {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id} className="text-[#5E3583] dark:text-purple-100 font-bold text-xs h-12 p-0 border-b border-[#5E3583]/10 dark:border-purple-700 ">
-                                        {header.isPlaceholder ? null : (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={cn(
-                                                    "select-none w-full dark:hover:bg-[#3D2566] hover:bg-[#5E3583]/10",
-                                                    "hover:text-[#5E3583] dark:hover:text-white",
-                                                    header.column.getIsSorted() && "bg-[#5E3583]/10 dark:bg-[#5E3583]/20",
+                                    <TableHead
+                                        key={header.id}
+                                        className={cn(
+                                            "text-[#5E3583] dark:text-purple-100 font-bold text-xs h-12 p-0 border-b border-[#5E3583]/10 dark:border-purple-700",
+                                            "select-none cursor-pointer dark:hover:bg-[#3D2566] hover:bg-[#5E3583]/10",
+                                            "hover:text-[#5E3583] dark:hover:text-white",
+                                            header.column.getIsSorted() && "bg-[#5E3583]/10 dark:bg-[#5E3583]/20"
+                                        )}
+                                        onClick={header.column.getToggleSortingHandler()}
+                                    >
+                                        {!header.isPlaceholder && (
+                                            <div className="flex items-center justify-between px-4">
+                                                <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                                                {header.column.getIsSorted() && (
+                                                    <span>
+                                                        {header.column.getIsSorted() === 'asc' ? (
+                                                            <GoSortAsc className="ml-1 w-4 h-4 shrink-0 text-[#5E3583] dark:text-purple-200" />
+                                                        ) : (
+                                                            <GoSortDesc className="ml-1 w-4 h-4 shrink-0 text-[#5E3583] dark:text-purple-200" />
+                                                        )}
+                                                    </span>
                                                 )}
-                                                onClick={header.column.getToggleSortingHandler()}
-                                            >
-                                                {flexRender(header.column.columnDef.header, header.getContext())}
-                                                {{
-                                                    asc: <GoSortAsc className="ml-1 w-4 h-4 shrink-0 text-[#5E3583] dark:text-purple-200" />,
-                                                    desc: <GoSortDesc className="ml-1 w-4 h-4 shrink-0 text-[#5E3583] dark:text-purple-200" />,
-                                                }[ header.column.getIsSorted() as string ] ?? null}
-                                            </Button>
+                                            </div>
                                         )}
                                     </TableHead>
                                 ))}

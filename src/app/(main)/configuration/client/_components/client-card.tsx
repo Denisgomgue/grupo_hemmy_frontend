@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { getAccountStatusLabel } from "@/utils/account-status-labels";
 import { getClientPaymentStatusLabel } from "@/utils/client-payment-status-labels";
 import Link from "next/link";
+import { getDisplayPaymentDate } from "@/utils/date-utils";
 
 // --- Helpers (Movidos aquí desde headers.tsx) ---
 
@@ -40,18 +41,28 @@ const getPaymentStatusVariant = (status: PaymentStatus): "success" | "secondary"
     }
 }
 
-const getPaymentStatus = (paymentDateStr: string | null | undefined): { text: string; variant: "success" | "warning" | "destructive" | "outline" } => {
-    if (!paymentDateStr) return { text: "N/D", variant: "outline" };
-    const paymentDate = new Date(paymentDateStr);
+const getPaymentStatus = (client: Client): { text: string; variant: "success" | "warning" | "destructive" | "outline" } => {
+    if (!client.paymentDate && !client.initialPaymentDate) return { text: "N/D", variant: "outline" };
+
+    const { date: nextPaymentDate, isFromInitial } = getDisplayPaymentDate(client);
+    if (nextPaymentDate === "No definida") return { text: "N/D", variant: "outline" };
+
+    const paymentDate = new Date(nextPaymentDate.split('/').reverse().join('-'));
     const today = new Date();
     const sevenDaysFromNow = new Date();
     sevenDaysFromNow.setDate(today.getDate() + 7);
+
     paymentDate.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
     sevenDaysFromNow.setHours(0, 0, 0, 0);
-    if (paymentDate < today) return { text: "En mora", variant: "destructive" };
-    if (paymentDate >= today && paymentDate <= sevenDaysFromNow) return { text: "Por vencer", variant: "warning" };
-    return { text: "Al día", variant: "success" };
+
+    if (paymentDate < today) {
+        return { text: "En mora", variant: "destructive" };
+    } else if (paymentDate >= today && paymentDate <= sevenDaysFromNow) {
+        return { text: "Por vencer", variant: "warning" };
+    } else {
+        return { text: "Al día", variant: "success" };
+    }
 };
 
 const getServiceIcon = (serviceName: string | undefined) => {
@@ -91,7 +102,7 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
 
     const initial = client.name ? client.name[ 0 ].toUpperCase() : "?";
     const avatarColor = getAvatarColor(client.name + client.lastName);
-    const paymentInfo = getPaymentStatus(client.paymentDate);
+    const paymentInfo = getPaymentStatus(client);
     const paymentBadgeVariant = paymentInfo.variant === 'warning' ? 'secondary' : paymentInfo.variant;
     const clientOwnPaymentStatus = client.paymentStatus;
 
@@ -132,7 +143,22 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
             </div>
             <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Próximo Pago</div>
-                <div className="font-medium">{client.paymentDate ? format(new Date(client.paymentDate), 'P', { locale: es }) : 'N/A'}</div>
+                <div className="space-y-1">
+                    <p className="text-sm font-medium leading-none">Próximo Pago</p>
+                    <p className="text-sm text-muted-foreground">
+                        {(() => {
+                            const { date, isFromInitial } = getDisplayPaymentDate(client);
+                            return (
+                                <>
+                                    {date}
+                                    {isFromInitial && (
+                                        <span className="ml-1 text-xs text-muted-foreground">(Basado en fecha inicial)</span>
+                                    )}
+                                </>
+                            );
+                        })()}
+                    </p>
+                </div>
             </div>
             <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Estado Cuenta / Pago</div>

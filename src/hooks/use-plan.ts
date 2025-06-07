@@ -10,7 +10,19 @@ const notifyListeners = () => {
 }
 
 export function usePlans() {
-    const [plans, setPlans] = useState<Plan[]>(planList)
+    const [ plans, setPlans ] = useState<Plan[]>(planList)
+    const [ maxPrice, setMaxPrice ] = useState<number>(0)
+
+    const getMaxPrice = useCallback(async () => {
+        try {
+            const response = await api.get<number>("/plans/max-price")
+            setMaxPrice(response.data)
+            return response.data
+        } catch (error) {
+            console.error("Error fetching max price:", error)
+            return 0
+        }
+    }, [])
 
     const refreshPlans = useCallback(async (page: number = 1, pageSize: number = 10) => {
         try {
@@ -20,7 +32,7 @@ export function usePlans() {
                     pageSize
                 }
             })
-            planList = response.data 
+            planList = response.data
             notifyListeners()
             return { data: planList, total: planList.length }
         } catch (error) {
@@ -30,13 +42,14 @@ export function usePlans() {
     }, [])
 
     useEffect(() => {
-        const listener = () => setPlans([...planList])
+        const listener = () => setPlans([ ...planList ])
         listeners.push(listener)
+        getMaxPrice() // Obtener el precio máximo al montar el componente
 
         return () => {
             listeners = listeners.filter((l) => l !== listener)
         }
-    }, [])
+    }, [ getMaxPrice ])
 
-    return { plans, refreshPlans }
+    return { plans, refreshPlans, maxPrice, getMaxPrice }
 }

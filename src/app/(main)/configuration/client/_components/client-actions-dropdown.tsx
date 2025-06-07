@@ -33,28 +33,53 @@ interface ClientActionsDropdownProps {
 }
 
 export function ClientActionsDropdown({ client, onEdit }: ClientActionsDropdownProps) {
-    const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-    const [loading, setLoading] = useState(false)
+    const [ showDeleteDialog, setShowDeleteDialog ] = useState(false)
+    const [ isDropdownOpen, setIsDropdownOpen ] = useState(false)
+    const [ loading, setLoading ] = useState(false)
     const { refreshClient } = useClient()
 
-    const handleDelete = async () => {
-        setLoading(true)
+    const handleDelete = (e: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault()
+            e.stopPropagation()
+        }
+        setIsDropdownOpen(false)
+        setShowDeleteDialog(true)
+    }
+
+    const handleConfirmDelete = async () => {
         try {
+            setLoading(true)
             await api.delete(`/client/${client.id}`)
             toast.success("Cliente eliminado correctamente")
             await refreshClient()
-            setShowDeleteDialog(false) // Cerrar diálogo al éxito
+            setShowDeleteDialog(false)
         } catch (error) {
-            toast.error("Error al eliminar el cliente")
             console.error("Error deleting client:", error)
+            toast.error("Error al eliminar el cliente")
         } finally {
             setLoading(false)
         }
     }
 
+    const handleCancelDelete = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault()
+            e.stopPropagation()
+        }
+        setShowDeleteDialog(false)
+    }
+
+    const handleEdit = (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDropdownOpen(false)
+        onEdit(client)
+    }
+
     return (
         <>
-            <DropdownMenu>
+            <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="h-8 w-8 p-0">
                         <span className="sr-only">Abrir menú</span>
@@ -64,13 +89,13 @@ export function ClientActionsDropdown({ client, onEdit }: ClientActionsDropdownP
                 <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => onEdit(client)}>
+                    <DropdownMenuItem onClick={handleEdit}>
                         <Pencil className="mr-2 h-4 w-4" />
                         Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                        onClick={() => setShowDeleteDialog(true)}
+                        onClick={handleDelete}
                     >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Eliminar
@@ -78,9 +103,15 @@ export function ClientActionsDropdown({ client, onEdit }: ClientActionsDropdownP
                 </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Alert Dialog para Confirmar Eliminación */}
-            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <AlertDialogContent>
+            <AlertDialog
+                open={showDeleteDialog}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        handleCancelDelete()
+                    }
+                }}
+            >
+                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                     <AlertDialogHeader>
                         <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                         <AlertDialogDescription>
@@ -88,9 +119,11 @@ export function ClientActionsDropdown({ client, onEdit }: ClientActionsDropdownP
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogCancel onClick={handleCancelDelete}>
+                            Cancelar
+                        </AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleDelete}
+                            onClick={handleConfirmDelete}
                             disabled={loading}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >

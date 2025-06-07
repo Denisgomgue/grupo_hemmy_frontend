@@ -4,7 +4,7 @@ import { Payment, PaymentType } from "@/types/payments/payment"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { getPaymentStatusLabel } from "@/utils/payment-status-labels"
-import { FileText, Calendar, DollarSign, Share2, Phone, Eye } from "lucide-react"
+import { FileText, Calendar, DollarSign, Share2, Phone, Eye, Trash2, PencilLine } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import html2canvas from 'html2canvas'
@@ -23,11 +23,24 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogCancel,
+    AlertDialogAction,
+} from "@/components/ui/alert-dialog"
 
-interface PaymentDetailModalProps {
-    payment: Payment | null
-    isOpen: boolean
-    onClose: () => void
+export interface PaymentDetailModalProps {
+    payment: Payment;
+    isOpen: boolean;
+    onClose: () => void;
+    onEdit?: (payment: Payment) => void;
+    onDelete?: (paymentId: string) => void;
 }
 
 const getPaymentTypeText = (type: PaymentType): string => {
@@ -115,12 +128,42 @@ const ReceiptPreview = ({ payment }: { payment: Payment }) => {
     )
 }
 
-export function PaymentDetailModal({ payment, isOpen, onClose }: PaymentDetailModalProps) {
-    if (!payment) return null
+export function PaymentDetailModal({ payment, isOpen, onClose, onEdit, onDelete }: PaymentDetailModalProps) {
+    const [ isDeleteDialogOpen, setIsDeleteDialogOpen ] = useState(false);
+    const [ isGenerating, setIsGenerating ] = useState(false);
+    const [ showPreview, setShowPreview ] = useState(false);
+    const receiptRef = useRef<HTMLDivElement>(null);
 
-    const receiptRef = useRef<HTMLDivElement>(null)
-    const [ isGenerating, setIsGenerating ] = useState(false)
-    const [ showPreview, setShowPreview ] = useState(false)
+    if (!payment) return null;
+
+    const handleDelete = (e: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        setIsDeleteDialogOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        try {
+            if (onDelete) {
+                await onDelete(payment.id.toString());
+            }
+            setIsDeleteDialogOpen(false);
+            onClose();
+        } catch (error) {
+            console.error('Error al eliminar:', error);
+            toast.error('Error al eliminar el pago');
+        }
+    };
+
+    const handleCancelDelete = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        setIsDeleteDialogOpen(false);
+    };
 
     const generateReceiptImage = async () => {
         if (receiptRef.current) {
@@ -215,6 +258,7 @@ export function PaymentDetailModal({ payment, isOpen, onClose }: PaymentDetailMo
 
                     {/* Encabezado con degradado */}
                     <div className="bg-gradient-to-r from-[#3A416F] to-[#4B5389] p-5 text-white relative flex-shrink-0">
+                        <DialogTitle className="sr-only">Detalles del Pago</DialogTitle>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <FileText className="h-5 w-5" />
@@ -372,17 +416,30 @@ export function PaymentDetailModal({ payment, isOpen, onClose }: PaymentDetailMo
                             >
                                 Cerrar
                             </Button>
-                            <Button
-                                variant="destructive"
-                                className="flex-1"
-                            >
-                                Eliminar
-                            </Button>
-                            <Button
-                                className="flex-1 bg-[#3A416F] hover:bg-[#4B5389]"
-                            >
-                                Editar Pago
-                            </Button>
+                            {onDelete && (
+                                <Button
+                                    variant="destructive"
+                                    className="flex-1"
+                                    onClick={handleDelete}
+                                >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Eliminar
+                                </Button>
+                            )}
+                            
+                            {onEdit && (
+                                <Button
+                                    className="flex-1 bg-[#3A416F] hover:bg-[#4B5389]"
+                                    onClick={() => {
+                                        onEdit(payment);
+                                        
+                                        onClose();
+                                    }}
+                                >
+                                    <PencilLine className="h-4 w-4 mr-2" />
+                                    Editar Pago
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </DialogContent>
@@ -415,6 +472,36 @@ export function PaymentDetailModal({ payment, isOpen, onClose }: PaymentDetailMo
                     </DialogFooter>
                 </PreviewDialogContent>
             </PreviewDialog>
+
+            {/* Modal de Confirmación de Eliminación */}
+            <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        handleCancelDelete();
+                    }
+                }}
+            >
+                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Eliminar Pago</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            ¿Estás seguro que deseas eliminar el pago {payment.code}? Esta acción no se puede deshacer.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={handleCancelDelete}>
+                            No, cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmDelete}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            Sí, eliminar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 } 

@@ -16,6 +16,9 @@ export const baseColumns: ColumnDef<Payment>[] = [
     header: "Cliente",
     cell: ({ row }) => {
       const client = row.original.client
+      if (!client) {
+        return <div className="text-muted-foreground">Cliente no disponible</div>
+      }
       return (
         <Button
           variant="ghost"
@@ -87,12 +90,11 @@ export const baseColumns: ColumnDef<Payment>[] = [
     header: "Código / Referencia",
     cell: ({ row }) => {
       const reference = row.getValue("reference") as string
-      const id = row.original.id
-      const formattedId = `PAG-${id.toString().padStart(4, "0")}`
+      const code = row.original.code
 
       return (
         <div>
-          <div className="font-medium">{formattedId}</div>
+          <div className="font-medium">{code}</div>
           {reference && <div className="text-sm text-muted-foreground">{reference}</div>}
         </div>
       )

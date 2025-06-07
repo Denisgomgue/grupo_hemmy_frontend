@@ -17,19 +17,23 @@ const paymentBaseSchema = {
     discount: z.number().min(0, "* El descuento debe ser positivo").default(0),
     dueDate: z.string().min(1, "* La fecha de vencimiento es requerida"),
     client: z.number({ required_error: "* El cliente es requerido" }),
+    advancePayment: z.boolean().default(false),
+    referenceImage: z.instanceof(File).optional().nullable(),
 };
 
 // Crear el esquema final con refinamiento
-export const PaymentSchema = z.object(paymentBaseSchema).refine((data) => {
-    // Si el tipo de pago es TRANSFER, YAPE o PLIN, el nombre de transferencia es obligatorio
-    if ([ 'TRANSFER', 'YAPE', 'PLIN' ].includes(data.paymentType)) {
-        return !!data.transfername && data.transfername.trim().length > 0;
-    }
-    // Para otros tipos de pago, no es obligatorio
-    return true;
-}, {
-    message: "* El nombre/referencia es obligatorio para transferencias, Yape o Plin",
-    path: [ "transfername" ],
+export const PaymentSchema = z.object({
+    client: z.number().optional(),
+    amount: z.number().min(0, "El monto debe ser mayor o igual a 0"),
+    paymentDate: z.string().optional(),
+    paymentType: PaymentTypeEnum,
+    reference: z.string().optional(),
+    transfername: z.string().optional(),
+    reconnection: z.boolean(),
+    discount: z.number().min(0, "El descuento debe ser mayor o igual a 0").optional(),
+    dueDate: z.string(),
+    advancePayment: z.boolean().default(false),
+    referenceImage: z.instanceof(File).optional().nullable(),
 });
 
 // Tipo inferido para el formulario

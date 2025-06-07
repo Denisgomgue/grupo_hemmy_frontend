@@ -21,15 +21,17 @@ export interface Client {
     dni: string;
     phone: string;
     address: string;
-    installationDate: string;
-    reference: string;
-    paymentDate: string;
-    advancePayment: boolean;
-    status: AccountStatus;
-    description: string;    
-    plan: Plan;
-    sector: Sector;
-    paymentStatus: PaymentStatus;
-    decoSerial?: string;
+    installationDate?: string;
+    reference?: string;
+    referenceImage?: string | File | null;
+    initialPaymentDate?: string;
+    paymentDate?: string;
+    advancePayment?: boolean;
+    description?: string;
     routerSerial?: string;
+    decoSerial?: string;
+    paymentStatus: PaymentStatus;
+    status: AccountStatus;
+    plan?: Plan;
+    sector?: Sector;
 }

@@ -29,10 +29,19 @@ import { PaginatedCards } from "@/components/dataTable/paginated-cards"
 import { ViewModeSwitcher } from "@/components/dataTable/view-mode-switcher"
 import { TableToolbar } from "@/components/dataTable/table-toolbar"
 import { useDebounce } from "@/hooks/use-debounce"
+import { toast } from "sonner"
+import api from "@/lib/axios"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { Settings2 } from "lucide-react"
 
 export default function PaymentPage() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
+  const { toast: useToastToast } = useToast()
   const [ isModalOpen, setIsModalOpen ] = useState(false)
   const [ selectedPayment, setSelectedPayment ] = useState<Payment | null>(null)
   const [ currentPage, setCurrentPage ] = useState(1)
@@ -42,6 +51,7 @@ export default function PaymentPage() {
   const [ searchTerm, setSearchTerm ] = useState("")
   const [ localSearchTerm, setLocalSearchTerm ] = useState("")
   const [ viewMode, setViewMode ] = useState<"list" | "grid">("list")
+  const [ isRegeneratingCodes, setIsRegeneratingCodes ] = useState(false)
   const [ paymentSummary, setPaymentSummary ] = useState({
     totalRecaudado: 0,
     pagosPagados: 0,
@@ -59,7 +69,8 @@ export default function PaymentPage() {
     createPayment,
     updatePayment,
     deletePayment,
-    getPaymentSummary
+    getPaymentSummary,
+    regeneratePaymentCodes
   } = usePayments()
 
   // Filtrado local de pagos
@@ -94,7 +105,7 @@ export default function PaymentPage() {
       setTotalRecords(result.total)
     } catch (error) {
       console.error('Error al cargar pagos:', error)
-      toast({
+      useToastToast({
         title: "Error al cargar pagos",
         variant: "destructive",
       })
@@ -136,19 +147,19 @@ export default function PaymentPage() {
   const handleDelete = async (paymentId: string) => {
     const idAsNumber = Number.parseInt(paymentId, 10)
     if (isNaN(idAsNumber)) {
-      toast({ title: "ID de pago inválido", variant: "destructive" })
+      useToastToast({ title: "ID de pago inválido", variant: "destructive" })
       return
     }
 
     setIsLoading(true)
     try {
       await deletePayment(idAsNumber)
-      toast({ title: "Pago eliminado correctamente" })
+      useToastToast({ title: "Pago eliminado correctamente" })
       loadPayments()
       loadPaymentSummary()
     } catch (error) {
       console.error('Error al eliminar pago:', error)
-      toast({
+      useToastToast({
         title: "Error al eliminar pago",
         variant: "destructive",
       })
@@ -162,10 +173,10 @@ export default function PaymentPage() {
     try {
       if (selectedPayment) {
         await updatePayment(selectedPayment.id, values)
-        toast({ title: "Pago actualizado correctamente" })
+        useToastToast({ title: "Pago actualizado correctamente" })
       } else {
         await createPayment(values)
-        toast({ title: "Pago creado correctamente" })
+        useToastToast({ title: "Pago creado correctamente" })
       }
       setIsModalOpen(false)
       setSelectedPayment(null)
@@ -173,7 +184,7 @@ export default function PaymentPage() {
       loadPaymentSummary()
     } catch (error) {
       console.error('Error al guardar pago:', error)
-      toast({
+      useToastToast({
         title: `Error al ${selectedPayment ? "actualizar" : "crear"} pago`,
         variant: "destructive",
       })
@@ -228,11 +239,60 @@ export default function PaymentPage() {
     ]
   }, [ handleDelete, handleEdit ])
 
+  const recalculatePaymentStates = async () => {
+    try {
+      const response = await api.post('/payments/recalculate-states');
+      toast.success(`Estados actualizados: ${response.data.message}`);
+      // Recargar la lista de pagos
+      await loadPayments();
+    } catch (error) {
+      toast.error('Error al recalcular los estados de pago');
+      console.error('Error:', error);
+    }
+  };
+
+  const handleRegenerateCodes = async () => {
+    if (isRegeneratingCodes) return;
+
+    try {
+      setIsRegeneratingCodes(true);
+      const result = await regeneratePaymentCodes();
+      toast.success(
+        `Se procesaron ${result.total} pagos. ${result.updated} actualizados.`
+      );
+      await loadPayments();
+    } catch (error) {
+      console.error('Error al regenerar códigos:', error);
+      toast.error("Error al regenerar los códigos de pago");
+    } finally {
+      setIsRegeneratingCodes(false);
+    }
+  };
+
   return (
     <MainContainer>
       <HeaderActions title="Registro de Pagos">
-        <ReloadButton onClick={handleReload} isLoading={isLoading} />
-        <AddButton onClick={handleAdd} text="Nuevo Pago" />
+        <div className="flex items-center gap-2">
+          <ReloadButton onClick={handleReload} disabled={isLoading} />
+          <AddButton onClick={handleAdd} disabled={isLoading} />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleRegenerateCodes}
+                  disabled={isRegeneratingCodes || isLoading}
+                >
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Regenerar códigos de pago</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </HeaderActions>
 
       {/* Summary Cards */}

@@ -11,7 +11,7 @@ const notifyListeners = () => {
 }
 
 export function usePayments() {
-    const [payments, setPayments] = useState<Payment[]>(paymentList)
+    const [ payments, setPayments ] = useState<Payment[]>(paymentList)
 
     const refreshPayments = useCallback(async (page: number = 1, pageSize: number = 10, status?: string, search?: string) => {
         try {
@@ -28,7 +28,7 @@ export function usePayments() {
             const response = await api.get<Payment[]>("/payments", {
                 params
             })
-            
+
             // Asumiendo que la respuesta del backend tiene un formato { data: Payment[], total: number }
             // Si el backend devuelve directamente un array, ajusta esto
             if (Array.isArray(response.data)) {
@@ -47,7 +47,7 @@ export function usePayments() {
                 paymentList = response.data as unknown as Payment[]
                 totalRecords = paymentList.length
             }
-            
+
             notifyListeners()
             return { data: paymentList, total: totalRecords }
         } catch (error) {
@@ -56,18 +56,28 @@ export function usePayments() {
         }
     }, [])
 
+    const regeneratePaymentCodes = useCallback(async () => {
+        try {
+            const response = await api.post('/payments/regenerate-codes')
+            return response.data
+        } catch (error) {
+            console.error("Error regenerating payment codes:", error)
+            throw error
+        }
+    }, [])
+
     const createPayment = useCallback(async (paymentData: any) => {
         try {
             // Asegurar que discount sea siempre un número
             const sanitizedData = {
                 ...paymentData,
-                discount: typeof paymentData.discount === 'number' ? 
-                          paymentData.discount : 
-                          paymentData.discount === "" || paymentData.discount === null || paymentData.discount === undefined ? 
-                          0 : 
-                          Number(paymentData.discount)
+                discount: typeof paymentData.discount === 'number' ?
+                    paymentData.discount :
+                    paymentData.discount === "" || paymentData.discount === null || paymentData.discount === undefined ?
+                        0 :
+                        Number(paymentData.discount)
             };
-            
+
             const response = await api.post("/payments", sanitizedData)
             await refreshPayments()
             return response.data
@@ -75,20 +85,20 @@ export function usePayments() {
             console.error("Error creating payment:", error)
             throw error
         }
-    }, [refreshPayments])
+    }, [ refreshPayments ])
 
     const updatePayment = useCallback(async (id: number, paymentData: any) => {
         try {
             // Asegurar que discount sea siempre un número
             const sanitizedData = {
                 ...paymentData,
-                discount: typeof paymentData.discount === 'number' ? 
-                          paymentData.discount : 
-                          paymentData.discount === "" || paymentData.discount === null || paymentData.discount === undefined ? 
-                          0 : 
-                          Number(paymentData.discount)
+                discount: typeof paymentData.discount === 'number' ?
+                    paymentData.discount :
+                    paymentData.discount === "" || paymentData.discount === null || paymentData.discount === undefined ?
+                        0 :
+                        Number(paymentData.discount)
             };
-            
+
             const response = await api.patch(`/payments/${id}`, sanitizedData)
             await refreshPayments()
             return response.data
@@ -96,7 +106,7 @@ export function usePayments() {
             console.error("Error updating payment:", error)
             throw error
         }
-    }, [refreshPayments])
+    }, [ refreshPayments ])
 
     const deletePayment = useCallback(async (id: number) => {
         try {
@@ -107,7 +117,7 @@ export function usePayments() {
             console.error("Error deleting payment:", error)
             throw error
         }
-    }, [refreshPayments])
+    }, [ refreshPayments ])
 
     const getPaymentSummary = useCallback(async (period: string = 'thisMonth') => {
         try {
@@ -127,7 +137,7 @@ export function usePayments() {
     }, [])
 
     useEffect(() => {
-        const listener = () => setPayments([...paymentList])
+        const listener = () => setPayments([ ...paymentList ])
         listeners.push(listener)
 
         return () => {
@@ -135,11 +145,12 @@ export function usePayments() {
         }
     }, [])
 
-    return { 
-        payments, 
-        refreshPayments, 
-        createPayment, 
-        updatePayment, 
+    return {
+        payments,
+        refreshPayments,
+        regeneratePaymentCodes,
+        createPayment,
+        updatePayment,
         deletePayment,
         getPaymentSummary
     }

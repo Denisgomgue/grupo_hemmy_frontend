@@ -1,4 +1,4 @@
-import { AccountStatusEnum } from "@/schemas/client-schema"
+import { AccountStatusEnum } from "@/schemas/client-schema";
 
 export const accountStatusLabels: Record<string, string> = {
     [ AccountStatusEnum.enum.ACTIVE ]: "Activo",

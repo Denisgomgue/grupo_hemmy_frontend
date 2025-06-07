@@ -3,11 +3,11 @@ import { Inter } from "next/font/google"
 import Providers from "@/components/providers"
 import { ClientLayoutWrapper } from "./client-layout-wrapper"
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: [ "latin" ] })
 
 export const metadata: Metadata = {
-    title: "App Principal",
-    description: "Descripción de la app",
+    title: "Grupo Hemmy",
+    description: "Pagina aministrativa de Grupo Hemmy",
 }
 
 export default function MainLayout({
@@ -16,12 +16,8 @@ export default function MainLayout({
     children: React.ReactNode
 }) {
     return (
-        <html lang="es">
-            <body className={inter.className}>
-                <Providers>
-                    <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
-                </Providers>
-            </body>
-        </html>
+        <Providers>
+            <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+        </Providers>
     )
 }

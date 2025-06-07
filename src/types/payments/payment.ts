@@ -17,6 +17,7 @@ export enum PaymentType {
 
 export interface Payment {
     id: number;
+    code: string;
     paymentDate: string;
     reference: string;
     reconnection: boolean;
@@ -29,4 +30,5 @@ export interface Payment {
     client: Client;
     created_At: string;
     updated_At: string;
+    advancePayment: boolean;
 }

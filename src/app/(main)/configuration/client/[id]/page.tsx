@@ -17,7 +17,7 @@ import api from "@/lib/axios"
 import { type Client, AccountStatus, PaymentStatus as ClientPaymentStatus } from "@/types/clients/client"
 import { type Payment, PaymentStatus, PaymentType } from "@/types/payments/payment"
 import { getPaymentStatusLabel } from "@/utils/payment-status-labels"
-import { Dialog, DialogTrigger, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog"
 import { PaymentForm } from "@/app/(main)/configuration/payment/_components/payment-form"
 import { getAccountStatusLabel } from "@/utils/account-status-labels"
 import { getClientPaymentStatusLabel } from "@/utils/client-payment-status-labels"
@@ -93,32 +93,95 @@ export default function ClientDetailPage() {
 
   // Handler para abrir el modal de pago
   const handleOpenPaymentModal = () => setIsPaymentModalOpen(true)
-  const handleClosePaymentModal = () => setIsPaymentModalOpen(false)
+  const handleClosePaymentModal = () => {
+    setIsPaymentModalOpen(false);
+    setSelectedPayment(null);
+  };
 
   // Handler para registrar el pago (puedes agregar lógica de recarga de pagos aquí)
   const handlePaymentSubmit = async (data: any) => {
     try {
-      await api.post('/payments', data)
-      setIsPaymentModalOpen(false)
-      await fetchClientPayments()
-      await fetchClientData()
-      toast({
-        title: "Pago registrado",
-        description: "El pago se guardó correctamente.",
-        variant: "default",
-      })
+      if (selectedPayment?.id) {
+        // Si hay un pago seleccionado, actualizamos
+        await api.patch(`/payments/${selectedPayment.id}`, data);
+        toast({
+          title: "Pago actualizado",
+          description: "El pago se actualizó correctamente.",
+          variant: "default",
+        });
+      } else {
+        // Si no hay pago seleccionado, creamos uno nuevo
+        await api.post('/payments', data);
+        toast({
+          title: "Pago registrado",
+          description: "El pago se guardó correctamente.",
+          variant: "default",
+        });
+      }
+
+      setIsPaymentModalOpen(false);
+      setSelectedPayment(null);
+
+      // Recargar los pagos
+      await fetchClientPayments();
+      // Recargar los datos del cliente para actualizar su estado
+      await fetchClientData();
+
     } catch (error) {
+      console.error('Error al procesar el pago:', error);
       toast({
         title: "Error",
-        description: "No se pudo registrar el pago.",
+        description: "No se pudo procesar el pago. Por favor, intente nuevamente.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const handlePaymentClick = (payment: Payment) => {
-    setSelectedPayment(payment)
-    setIsPaymentDetailModalOpen(true)
+    setSelectedPayment(payment);
+    setIsPaymentDetailModalOpen(true);
+  };
+
+  const handleEditPayment = (payment: Payment) => {
+    setSelectedPayment(payment);
+    setIsPaymentModalOpen(true);
+  };
+
+  const handleClosePaymentDetailModal = () => {
+    setIsPaymentDetailModalOpen(false);
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    try {
+      await api.delete(`/payments/${paymentId}`);
+      setIsPaymentDetailModalOpen(false);
+      setSelectedPayment(null);
+
+      // Recargar datos del cliente y pagos
+      await Promise.all([
+        fetchClientData(),
+        fetchClientPayments()
+      ]);
+
+      toast({
+        title: "Pago eliminado",
+        description: "El pago se eliminó correctamente.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('Error al eliminar el pago:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el pago.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  interface PaymentActionsDropdownProps {
+    payment: Payment
+    onEdit: (payment: Payment) => void
+    onDelete?: (paymentId: string) => void
   }
 
   const getStatusVariant = (status: AccountStatus): "accountSuccess" | "secondary" | "destructive" | "outline" => {
@@ -320,16 +383,55 @@ export default function ClientDetailPage() {
                 </Button>
               </DialogTrigger>
               <DialogContent className="w-full max-w-2xl">
-                <DialogTitle>Registrar Pago</DialogTitle>
-                <PaymentForm 
+                <DialogHeader>
+                  <DialogTitle>{selectedPayment ? "Editar" : "Registrar"} Pago</DialogTitle>
+                </DialogHeader>
+                <PaymentForm
                   onSubmit={handlePaymentSubmit}
                   onCancel={handleClosePaymentModal}
                   isLoading={false}
-                  payment={{
-                    client: { id: client.id },
-                    amount: client.plan?.price || 0,
-                  } as any}
-                  
+                  hideClientSelection={false}
+                  preselectedClient={client}
+                  payment={selectedPayment ? {
+                    ...selectedPayment,
+                    client: selectedPayment.client
+                  } : {
+                    id: 0,
+                    code: '',
+                    client: {
+                      id: client.id,
+                      name: client.name,
+                      lastName: client.lastName,
+                      dni: client.dni,
+                      phone: client.phone || '',
+                      address: client.address || '',
+                      installationDate: client.installationDate,
+                      reference: client.reference,
+                      referenceImage: client.referenceImage,
+                      initialPaymentDate: client.initialPaymentDate,
+                      paymentDate: client.paymentDate,
+                      advancePayment: client.advancePayment || false,
+                      description: client.description || '',
+                      routerSerial: client.routerSerial || '',
+                      decoSerial: client.decoSerial || '',
+                      paymentStatus: client.paymentStatus,
+                      status: client.status,
+                      plan: client.plan,
+                      sector: client.sector
+                    },
+                    amount: Number(client.plan?.price) || 0,
+                    paymentDate: format(new Date(), 'yyyy-MM-dd'),
+                    dueDate: format(new Date(), 'yyyy-MM-dd'),
+                    paymentType: PaymentType.TRANSFER,
+                    reference: '',
+                    transfername: '',
+                    reconnection: false,
+                    discount: 0,
+                    state: PaymentStatus.PENDING,
+                    created_At: new Date().toISOString(),
+                    updated_At: new Date().toISOString(),
+                    advancePayment: false
+                  }}
                 />
               </DialogContent>
             </Dialog>
@@ -385,7 +487,7 @@ export default function ClientDetailPage() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => handlePaymentClick(payment)}
                     >
-                      <TableCell className="font-medium">PAG-{payment.id.toString().padStart(4, '0')}</TableCell>
+                      <TableCell className="font-medium">{payment.code || "-"}</TableCell>
                       <TableCell>
                         {payment.paymentDate
                           ? format(new Date(payment.paymentDate), "dd/MM/yyyy", { locale: es })
@@ -429,11 +531,16 @@ export default function ClientDetailPage() {
         </TabsContent>
       </Tabs>
 
-      <PaymentDetailModal
-        payment={selectedPayment}
-        isOpen={isPaymentDetailModalOpen}
-        onClose={() => setIsPaymentDetailModalOpen(false)}
-      />
+      {/* Modal de Detalles de Pago */}
+      {selectedPayment && (
+        <PaymentDetailModal
+          payment={selectedPayment}
+          isOpen={isPaymentDetailModalOpen}
+          onClose={handleClosePaymentDetailModal}
+          onEdit={handleEditPayment}
+          onDelete={handleDeletePayment}
+        />
+      )}
     </div>
   )
 }

@@ -4,11 +4,12 @@ import * as React from 'react';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Client } from "@/types/clients/client";
+import { Service } from "@/types/services/service";
 import { useClient } from '@/hooks/use-client';
 import api from '@/lib/axios';
 import { ClientForm } from "./_components/client-form";
 import { ResponsiveTable } from "@/components/responsive-table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { MainContainer } from "@/components/layout/main-container";
 import { HeaderActions } from "@/components/layout/header-actions";
 import { AddButton } from "@/components/layout/add-button";
@@ -26,6 +27,14 @@ import { useEffect, useState } from "react"
 import { TableToolbar } from "@/components/dataTable/table-toolbar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { useDebounce } from "@/hooks/use-debounce"
+import { FilterButton } from "@/components/dataTable/filter-button"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { AdvancedFilters } from "@/components/dataTable/advanced-filters"
+import { SectorSelector } from "@/components/dataTable/sector-selector"
+import { usePlans } from "@/hooks/use-plan"
+import { useSectors } from "@/hooks/use-sector"
+import { Sector } from "@/types/sectors/sector"
 
 interface ClientSummary {
     totalClientes: number;
@@ -47,13 +56,71 @@ export default function ClientPage() {
     const [ searchTerm, setSearchTerm ] = useState("");
     const [ isLoading, setIsLoading ] = useState(false);
     const [ isSubmitting, setIsSubmitting ] = useState(false);
+    const debouncedSearchTerm = useDebounce(searchTerm, 500);
+    const [ statusFilter, setStatusFilter ] = useState<string>("all");
+    const [ selectedSectors, setSelectedSectors ] = useState<string[]>([]);
+    const [ advancedFilters, setAdvancedFilters ] = useState({});
 
     const { refreshClient, getClientSummary } = useClient();
+    const { maxPrice } = usePlans();
+    const { sectors } = useSectors();
+
+    // Query para obtener los servicios
+    const servicesQuery = useQuery<Service[]>({
+        queryKey: [ 'services' ],
+        queryFn: async () => {
+            const response = await api.get('/services');
+            return response.data;
+        }
+    });
+
+    // Definir los grupos de filtros
+    const filterGroups = React.useMemo(() => [
+        {
+            id: 'status',
+            label: 'Estado del Cliente',
+            type: 'checkbox' as const,
+            options: [
+                { id: 'active', label: 'Activos' },
+                { id: 'expired', label: 'Vencidos' },
+                { id: 'expiring', label: 'Por vencer' },
+                { id: 'suspended', label: 'Suspendidos' }
+            ]
+        },
+        {
+            id: 'services',
+            label: 'Servicios',
+            type: 'checkbox' as const,
+            options: servicesQuery.data?.map((service: Service) => ({
+                id: service.id.toString(),
+                label: service.name
+            })) || []
+        },
+        {
+            id: 'sectors',
+            label: 'Sectores',
+            type: 'checkbox-group' as const,
+            options: sectors?.map((sector: Sector) => ({
+                id: sector.id.toString(),
+                label: sector.name
+            })) || []
+        },
+        {
+            id: 'planCost',
+            label: 'Costo del Plan',
+            type: 'slider' as const,
+            range: {
+                min: 0,
+                max: maxPrice || 500,
+                step: 10
+            }
+        }
+    ], [ servicesQuery.data, maxPrice, sectors ]);
 
     // Query para obtener los clientes
     const clientsQuery = useQuery<{ data: Client[]; total: number }, Error>({
-        queryKey: [ "clients", currentPage, pageSize ],
-        queryFn: () => refreshClient(currentPage, pageSize),
+        queryKey: [ "clients", currentPage, pageSize, debouncedSearchTerm, advancedFilters, selectedSectors ],
+        queryFn: () => refreshClient(currentPage, pageSize, debouncedSearchTerm, advancedFilters, selectedSectors),
     });
 
     // Query para obtener el resumen de clientes
@@ -67,10 +134,11 @@ export default function ClientPage() {
         queryKey: [ "clientSummary", "thisMonth" ],
         queryFn: () => getClientSummary("thisMonth"),
         initialData: {
-            active: 0,
-            inactive: 0,
-            new: 0,
-            total: 0
+            totalClientes: 0,
+            clientesActivos: 0,
+            clientesVencidos: 0,
+            clientesPorVencer: 0,
+            period: "thisMonth"
         }
     });
 
@@ -162,17 +230,13 @@ export default function ClientPage() {
         deleteMutation.mutate(idAsNumber);
     };
 
-    const handleSave = (values: ClientFormData) => {
-        setIsSubmitting(true);
-        try {
-            if (selectedClient) {
-                updateMutation.mutate({ id: selectedClient.id, data: values });
-            } else {
-                createMutation.mutate(values);
-            }
-        } finally {
-            setIsSubmitting(false);
-        }
+    // Nueva función para pasar a ClientForm como onSubmit
+    const handleClientFormSubmitSuccess = (values: ClientFormData) => {
+        queryClient.invalidateQueries({ queryKey: [ "clients" ] });
+        queryClient.invalidateQueries({ queryKey: [ "clientSummary" ] });
+        setIsModalOpen(false); // Cerrar el modal
+        setSelectedClient(null); // Limpiar el cliente seleccionado
+        console.log("ClientPage: handleClientFormSubmitSuccess, modal closed, queries invalidated.", values);
     };
 
     const handlePaginationChange = (page: number, newPageSize: number) => {
@@ -205,6 +269,23 @@ export default function ClientPage() {
 
     const isLoadingMutation = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
     const isFetchingOrMutating = clientsQuery.isFetching || isLoadingMutation;
+
+    const handleSearch = (value: string) => {
+        setSearchTerm(value);
+        setCurrentPage(1);
+    };
+
+    const handleAdvancedFiltersChange = (newFilters: any) => {
+        setAdvancedFilters(newFilters);
+        // Extraer los sectores seleccionados de los filtros avanzados
+        const selectedSectorIds = newFilters.sectors ?
+            Object.entries(newFilters.sectors)
+                .filter(([ _, value ]) => value)
+                .map(([ key ]) => key)
+            : [];
+        setSelectedSectors(selectedSectorIds);
+        setCurrentPage(1);
+    };
 
     return (
         <MainContainer>
@@ -255,31 +336,27 @@ export default function ClientPage() {
             />
 
             {/* Selector de vista y barra de herramientas */}
-            <div className="flex items-center justify-between">
-                <TableToolbar
-                    value={searchTerm}
-                    onValueChange={setSearchTerm}
-                    onSearch={handleReload}
-                    searchPlaceholder="Buscar clientes..."
-                    filters={
-                        <Select defaultValue="active">
-                            <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Filtrar por estado" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="active">Activos</SelectItem>
-                                <SelectItem value="inactive">Inactivos</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    }
-                    actions={
-                        <>
-                            <Button variant="outline">Exportar</Button>
-                            <Button variant="outline">Importar</Button>
-                        </>
-                    }
-                />
-                <ViewModeSwitcher viewMode={viewMode} setViewMode={(mode) => setViewMode(mode as "list" | "grid")} />
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <TableToolbar
+                        value={searchTerm}
+                        onValueChange={handleSearch}
+                        onSearch={() => clientsQuery.refetch()}
+                        searchPlaceholder="Buscar por DNI, nombre o apellidos..."
+                        actions={
+                            <>
+                                <AdvancedFilters
+                                    groups={filterGroups}
+                                    onFiltersChange={handleAdvancedFiltersChange}
+                                    initialFilters={advancedFilters}
+                                />
+                                <Button variant="outline">Importar</Button>
+                                <Button variant="outline">Exportar</Button>
+                            </>
+                        }
+                    />
+                    <ViewModeSwitcher viewMode={viewMode} setViewMode={(mode) => setViewMode(mode as "list" | "grid")} />
+                </div>
             </div>
 
             {viewMode === "list" ? (
@@ -321,13 +398,19 @@ export default function ClientPage() {
                     }}
                 >
                     <DialogHeader>
-                        <DialogTitle>{selectedClient ? 'Editar Cliente' : 'Agregar Cliente'}</DialogTitle>
+                        <DialogTitle>{selectedClient ? "Editar Cliente" : "Agregar Cliente"}</DialogTitle>
+                        <DialogDescription>
+                            {selectedClient ? "Modifique los datos del cliente seleccionado" : "Complete el formulario para agregar un nuevo cliente"}
+                        </DialogDescription>
                     </DialogHeader>
                     <ClientForm
                         client={selectedClient}
-                        onSubmit={handleSave}
-                        isLoading={isSubmitting}
-                        onCancel={() => setIsModalOpen(false)}
+                        onSubmit={handleClientFormSubmitSuccess}
+                        isLoading={isSubmitting || createMutation.isPending || updateMutation.isPending}
+                        onCancel={() => {
+                            setIsModalOpen(false);
+                            setSelectedClient(null);
+                        }}
                     />
                 </DialogContent>
             </Dialog>
