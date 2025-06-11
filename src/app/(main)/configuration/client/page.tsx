@@ -22,7 +22,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { PaginatedCards } from "@/components/dataTable/paginated-cards"
 import { ViewModeSwitcher } from "@/components/dataTable/view-mode-switcher"
 import { InfoSummaryCards } from "@/components/info-summary-cards"
-import { Users, UserCheck, UserPlus, UserX, Clock } from "lucide-react"
+import { Users, UserCheck, UserPlus, UserX, Clock, RefreshCcw } from "lucide-react"
 import { useEffect, useState } from "react"
 import { TableToolbar } from "@/components/dataTable/table-toolbar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -60,6 +60,7 @@ export default function ClientPage() {
     const [ statusFilter, setStatusFilter ] = useState<string>("all");
     const [ selectedSectors, setSelectedSectors ] = useState<string[]>([]);
     const [ advancedFilters, setAdvancedFilters ] = useState({});
+    const [ isSyncing, setIsSyncing ] = useState(false);
 
     const { refreshClient, getClientSummary } = useClient();
     const { maxPrice } = usePlans();
@@ -287,9 +288,47 @@ export default function ClientPage() {
         setCurrentPage(1);
     };
 
+    // Agregar función para sincronizar estados
+    const syncClientStates = async () => {
+        try {
+            setIsSyncing(true);
+            await api.post('/client/sync-states');
+
+            // Refrescar los datos
+            await Promise.all([
+                clientsQuery.refetch(),
+                summaryQuery.refetch(),
+                newClientsQuery.refetch()
+            ]);
+
+            toast({
+                title: "Estados sincronizados",
+                description: "Los estados de los clientes han sido actualizados correctamente.",
+            });
+        } catch (error) {
+            toast({
+                title: "Error al sincronizar estados",
+                description: "No se pudieron actualizar los estados de los clientes.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     return (
         <MainContainer>
             <HeaderActions title="Gestión de Clientes">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={syncClientStates}
+                    disabled={isSyncing}
+                    className="gap-2"
+                >
+                    <RefreshCcw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'Sincronizando...' : 'Sincronizar Estados'}
+                </Button>
                 <ReloadButton
                     onClick={handleReload}
                     isLoading={isFetchingOrMutating || summaryQuery.isFetching}
