@@ -189,5 +189,18 @@ export const baseColumns: ColumnDef<Client>[] = [
             )
         }
     },
+    // // Columna Dirección IP
+    // {
+    //     accessorKey: "ipAddress",
+    //     header: "DIRECCIÓN IP",
+    //     cell: ({ row }) => {
+    //         const ipAddress = row.original.ipAddress;
+    //         return (
+    //             <div className="font-mono text-sm">
+    //                 {ipAddress || 'N/A'}
+    //             </div>
+    //         )
+    //     }
+    // },
 ]
 

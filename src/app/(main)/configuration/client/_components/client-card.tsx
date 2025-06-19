@@ -14,6 +14,7 @@ import { getAccountStatusLabel } from "@/utils/account-status-labels";
 import { getClientPaymentStatusLabel } from "@/utils/client-payment-status-labels";
 import Link from "next/link";
 import { getDisplayPaymentDate } from "@/utils/date-utils";
+import { ClientImageFill } from "@/components/ui/client-image";
 
 // --- Helpers (Movidos aquí desde headers.tsx) ---
 
@@ -116,10 +117,19 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
                     <Avatar className={`h-9 w-9 text-sm ${avatarColor} text-black`}>
                         <AvatarFallback>{initial}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                         <div className="font-semibold">{client.name} {client.lastName}</div>
                         <div className="text-xs text-muted-foreground">Sector: {client.sector?.name || 'N/A'}</div>
                     </div>
+                    {/* Imagen de referencia */}
+                    <ClientImageFill
+                        imagePath={client.referenceImage}
+                        alt="Imagen de Referencia"
+                        className="w-8 h-8 flex-shrink-0"
+                        showFallbackIcon={true}
+                        fallbackText=""
+                        sizes="32px"
+                    />
                 </div>
             </Link>
             <ClientActionsDropdown client={client} onEdit={onEdit} />
@@ -171,7 +181,7 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
     );
 
     const bottomSectionContent = (
-        <div className="grid grid-cols-2 gap-x-4 text-sm">
+        <div className="grid grid-cols-3 gap-x-4 text-sm">
             <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Teléfono</div>
                 <div className="font-medium">{client.phone || 'N/A'}</div>
@@ -179,6 +189,10 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
             <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Renta</div>
                 <div className="font-medium">{client.advancePayment ? "Adelantada" : "Pendiente"}</div>
+            </div>
+            <div>
+                <div className="text-xs text-muted-foreground mb-0.5">IP</div>
+                <div className="font-medium">{client.ipAddress || 'N/A'}</div>
             </div>
         </div>
     );

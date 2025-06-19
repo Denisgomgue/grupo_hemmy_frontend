@@ -94,6 +94,7 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
             paymentStatus: client?.paymentStatus,
             decoSerial: client?.decoSerial ?? '',
             routerSerial: client?.routerSerial ?? '',
+            ipAddress: client?.ipAddress ?? '',
             referenceImage: undefined
         },
         mode: "onChange"
@@ -129,6 +130,7 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                 paymentStatus: client.paymentStatus,
                 decoSerial: client.decoSerial ?? '',
                 routerSerial: client.routerSerial ?? '',
+                ipAddress: client.ipAddress ?? '',
                 referenceImage: undefined
             });
             setSelectedServiceId(client.plan?.service?.id || null);
@@ -171,6 +173,7 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                 paymentStatus: undefined,
                 decoSerial: '',
                 routerSerial: '',
+                ipAddress: '',
                 referenceImage: undefined
             });
             setIsDniValid(false);
@@ -221,7 +224,7 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
             case 1:
                 return [ "name", "lastName", "dni", "phone", "address", "reference", "description" ];
             case 2:
-                return [ "plan", "sector", "installationDate", "paymentDate", "status", "advancePayment", "decoSerial", "routerSerial" ];
+                return [ "plan", "sector", "installationDate", "paymentDate", "status", "advancePayment", "decoSerial", "routerSerial", "ipAddress" ];
             case 3:
                 return [ "referenceImage" ];
             default:
@@ -425,6 +428,59 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
         const numericId = parseInt(serviceId, 10);
         setSelectedServiceId(isNaN(numericId) ? null : numericId);
         form.setValue('plan', 0, { shouldValidate: true });
+    };
+
+    // Función para validar y formatear IPv4
+    const formatIPv4 = (value: string) => {
+        // Eliminar caracteres no numéricos ni puntos
+        let cleanValue = value.replace(/[^\d.]/g, '');
+
+        // Dividir en octetos
+        let octets = cleanValue.split('.');
+
+        // Procesar cada octeto
+        octets = octets.map((octet, index) => {
+            if (octet === '') return '';
+
+            // Convertir a número
+            let num = parseInt(octet, 10);
+
+            // Si es el último octeto que se está escribiendo, permitir números parciales
+            if (index === octets.length - 1 && value.endsWith(octet)) {
+                return octet;
+            }
+
+            // Validar rango (0-255)
+            if (isNaN(num) || num < 0) return '0';
+            if (num > 255) return '255';
+
+            return num.toString();
+        }).slice(0, 4); // Máximo 4 octetos
+
+        // Unir octetos con puntos
+        return octets.join('.');
+    };
+
+    // Función para manejar el cambio en el input de IP
+    const handleIPChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (...event: any[]) => void) => {
+        let value = e.target.value;
+
+        // Si se presiona backspace y hay un punto al final, eliminar el punto
+        if (value.length < (e.target.defaultValue?.length || 0) && value.endsWith('.')) {
+            value = value.slice(0, -1);
+        }
+
+        // Formatear el valor
+        let formattedValue = formatIPv4(value);
+
+        // Agregar punto automáticamente después de un octeto válido
+        const octets = formattedValue.split('.');
+        const lastOctet = octets[ octets.length - 1 ];
+        if (lastOctet.length === 3 && octets.length < 4 && parseInt(lastOctet) <= 255) {
+            formattedValue += '.';
+        }
+
+        onChange(formattedValue);
     };
 
     return (
@@ -716,7 +772,7 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                                         <FormDescription>
                                             {!client || !client.initialPaymentDate
                                                 ? "Esta fecha se establecerá como la fecha inicial de pago"
-                                                : "La fecha de pago se calcula automáticamente basada en la fecha inicial de pago"}
+                                                : "Basada en la fecha inicial de pago"}
                                         </FormDescription>
                                         <FormMessage />
                                     </FormItem>
@@ -753,9 +809,6 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                                         <FormLabel htmlFor="advancePaymentCheckbox">
                                             Pago Adelantado
                                         </FormLabel>
-                                        <FormDescription>
-                                            Marque esta opción si el cliente realiza pagos por adelantado
-                                        </FormDescription>
                                     </div>
                                     <FormMessage className="ml-auto" />
                                 </FormItem>
@@ -774,6 +827,25 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                                     <FormMessage />
                                 </FormItem>
                             )} />
+                            <FormField
+                                control={form.control}
+                                name="ipAddress"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Dirección IP</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                placeholder="Ej: 192.168.1.1"
+                                                onChange={(e) => handleIPChange(e, field.onChange)}
+                                                maxLength={15} // Longitud máxima de una IPv4
+                                            />
+                                        </FormControl>
+
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
                     )}
 

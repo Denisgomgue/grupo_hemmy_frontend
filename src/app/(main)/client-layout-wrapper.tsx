@@ -18,20 +18,24 @@ export function ClientLayoutWrapper({ children }: { children: React.ReactNode })
     const { user, loading } = useAuth();
     const { layoutMode } = useTheme();
     // Inicializar con habilidades vacías o básicas hasta que el usuario cargue
-    const [ability, setAbility] = useState(() => defineAbilitiesFor(null));
+    const [ ability, setAbility ] = useState(() => defineAbilitiesFor(null));
+    const [ isHydrated, setIsHydrated ] = useState(false);
 
-    // Restaurar useEffect de habilidad
+    useEffect(() => {
+        setIsHydrated(true);
+    }, []);
+
     useEffect(() => {
         // Actualizar habilidades cuando el usuario cambie
         setAbility(defineAbilitiesFor(user));
-    }, [user]);
+    }, [ user ]);
 
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [ isSidebarOpen, setIsSidebarOpen ] = useState(false);
+    const [ isSidebarCollapsed, setIsSidebarCollapsed ] = useState(false);
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
     const toggleSidebarCollapse = () => setIsSidebarCollapsed(!isSidebarCollapsed);
-    const [isMobile, setIsMobile] = useState(false);
+    const [ isMobile, setIsMobile ] = useState(false);
 
     useEffect(() => {
         const checkMobile = () => {
@@ -43,14 +47,14 @@ export function ClientLayoutWrapper({ children }: { children: React.ReactNode })
     }, []);
 
     // Restaurar comprobación de carga
-    if (loading) { 
+    if (!isHydrated || loading) {
         return (
             <div className="flex h-screen w-full justify-center items-center">
                 <Spinner />
             </div>
         );
     }
-    
+
     const isDetached = layoutMode === "detached";
 
     return (
@@ -65,7 +69,7 @@ export function ClientLayoutWrapper({ children }: { children: React.ReactNode })
                                 "fixed inset-y-0 z-50 overflow-y-auto bg-background transition-all duration-300 ease-in-out",
                                 {
                                     "-left-4": !isSidebarOpen && isDetached && isMobile, // Lógica de posición
-                                    "left-0": isSidebarOpen || !isDetached || !isMobile, 
+                                    "left-0": isSidebarOpen || !isDetached || !isMobile,
                                 },
                                 isDetached ? "ml-2.5 mt-4 md:mt-4 md:ml-4 rounded-lg h-[calc(100vh-2rem)] shadow-2xl" : "h-screen shadow-xl md:static lg:z-auto", // Estilo detached
                                 isSidebarCollapsed ? "md:w-20" : "w-60", // Ancho colapsado/expandido
@@ -81,19 +85,19 @@ export function ClientLayoutWrapper({ children }: { children: React.ReactNode })
                             />
                         </aside>
                         <div className="flex flex-1 flex-col overflow-hidden">
-                            <TopBar onMenuToggle={toggleSidebar} sidebarCollapsed={isSidebarCollapsed}/>
+                            <TopBar onMenuToggle={toggleSidebar} sidebarCollapsed={isSidebarCollapsed} />
                             <main
                                 className={cn(
                                     "flex-1 p-4 min-h-[calc(100vh-4rem)] overflow-y-auto",
                                     // Lógica de margen basada en estado detached/collapsed
                                     !isSidebarCollapsed && isDetached ? "md:ml-24" : "md:ml-0", isSidebarCollapsed && isDetached ? "md:ml-24" : "mt-0",
-                                    isDetached ? "mt-0" : "mt-0", 
+                                    isDetached ? "mt-0" : "mt-0",
                                 )}
                             >
-                                {/* El div interno para padding podría ajustarse según diseño */} 
+                                {/* El div interno para padding podría ajustarse según diseño */}
                                 <div className={cn("rounded-lg p-4", !isSidebarCollapsed && isDetached ? "mx-2 md:ml-40 ml-0" : "")}>
                                     {children} { /* Renderiza las páginas */}
-                                </div> 
+                                </div>
                             </main>
                         </div>
                     </div>

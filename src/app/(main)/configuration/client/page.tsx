@@ -350,7 +350,7 @@ export default function ClientPage() {
                     {
                         title: "Clientes Activos",
                         value: summaryQuery.data?.clientesActivos || 0,
-                        description: "Al día con sus pagos",
+                        description: "En estado activo",
                         icon: <UserCheck className="h-8 w-8 text-green-500" />,
                         borderColor: "border-l-green-500",
                         isLoading: summaryQuery.isLoading || summaryQuery.isFetching

@@ -13,7 +13,40 @@ import api, { setAuthToken } from "@/lib/axios"
 import { useAuth } from "@/contexts/AuthContext"
 import Link from "next/link"
 import { sha256 } from "js-sha256"
-import type React from "react" // Added import for React
+import type React from "react"
+import { motion, AnimatePresence, Variants } from "framer-motion"
+import { useSpring, animated } from "@react-spring/web"
+import CircuitBackground from "@/components/ui/CircuitBackground"
+
+const TypewriterInput = ({ value, type, ...props }: { value: string; type: string } & React.InputHTMLAttributes<HTMLInputElement>) => {
+    const [ displayValue, setDisplayValue ] = useState("")
+
+    useEffect(() => {
+        if (type === "text") {
+            let currentIndex = 0
+            const interval = setInterval(() => {
+                if (currentIndex <= value.length) {
+                    setDisplayValue(value.slice(0, currentIndex))
+                    currentIndex++
+                } else {
+                    clearInterval(interval)
+                }
+            }, 50) // Velocidad de escritura
+            return () => clearInterval(interval)
+        } else {
+            setDisplayValue(value)
+        }
+    }, [ value, type ])
+
+    return (
+        <Input
+            {...props}
+            type={type}
+            value={type === "text" ? displayValue : value}
+            className={`${props.className} transition-all duration-300`}
+        />
+    )
+}
 
 export default function LoginForm() {
     const [ email, setEmail ] = useState("")
@@ -30,6 +63,61 @@ export default function LoginForm() {
         }
         return false
     })
+
+    const fadeIn: Variants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: {
+                duration: 0.6,
+                ease: "easeOut"
+            }
+        }
+    }
+
+    const springProps = useSpring({
+        from: { transform: 'scale(0.9)', opacity: 0 },
+        to: { transform: 'scale(1)', opacity: 1 },
+        config: { tension: 280, friction: 20 }
+    })
+
+    const buttonVariants: Variants = {
+        initial: { scale: 1 },
+        hover: {
+            scale: 1.02,
+            boxShadow: "0 5px 15px rgba(7, 0, 0, 0.3)",
+            transition: {
+                duration: 0.2,
+                ease: "easeInOut"
+            }
+        },
+        tap: {
+            scale: 0.98,
+            transition: {
+                duration: 0.1,
+                ease: "easeInOut"
+            }
+        }
+    }
+
+    const inputVariants: Variants = {
+        initial: { scale: 1 },
+        focus: {
+            scale: 1.02,
+            transition: {
+                duration: 0.2,
+                ease: "easeInOut"
+            }
+        },
+        blur: {
+            scale: 1,
+            transition: {
+                duration: 0.2,
+                ease: "easeInOut"
+            }
+        }
+    }
 
     const toggleDarkMode = () => {
         const newDarkMode = !darkMode
@@ -63,7 +151,6 @@ export default function LoginForm() {
             const profileResponse = await api.get("/auth/profile")
             const userProfile = profileResponse.data
 
-            // Store login data in localStorage
             localStorage.setItem("userProfile", JSON.stringify(userProfile))
             localStorage.setItem("passwordHash", sha256(password))
 
@@ -98,286 +185,444 @@ export default function LoginForm() {
         }
     }, [ darkMode ])
 
+    // Agregar estos estilos de animación después de las otras definiciones de variantes
+    const circuitAnimation = `
+    @keyframes electric-flow {
+        0% {
+            stroke-dashoffset: 1000;
+            opacity: 0.4;
+        }
+        50% {
+            opacity: 1;
+        }
+        100% {
+            stroke-dashoffset: 0;
+            opacity: 0.4;
+        }
+    }
+
+    @keyframes node-pulse {
+        0%, 100% {
+            fill: rgba(255,255,255,0.2);
+            r: 4;
+        }
+        50% {
+            fill: rgba(255,255,255,0.8);
+            r: 5;
+        }
+    }
+
+    @keyframes chip-glow {
+        0%, 100% {
+            stroke: rgba(255,255,255,0.2);
+            stroke-width: 1.5;
+        }
+        50% {
+            stroke: rgba(255,255,255,0.6);
+            stroke-width: 2;
+        }
+    }
+
+    .circuit-path {
+        stroke-dasharray: 10;
+        stroke-dashoffset: 1000;
+        animation: electric-flow 3s linear infinite;
+    }
+
+    .electric-flow {
+        stroke-dasharray: 200;
+        stroke-dashoffset: 1000;
+        animation: electric-flow 2s linear infinite;
+    }
+
+    .circuit-node {
+        fill: rgba(255,255,255,0.2);
+        animation: node-pulse 2s ease-in-out infinite;
+    }
+
+    .chip-component {
+        animation: chip-glow 3s ease-in-out infinite;
+    }
+
+    .dark .circuit-path {
+        stroke: rgba(255,255,255,0.25);
+    }
+
+    .dark .electric-flow {
+        opacity: 0.8;
+    }
+
+    .dark .circuit-node {
+        animation: node-pulse 2s ease-in-out infinite;
+    }
+
+    .dark .chip-component {
+        stroke: rgba(255,255,255,0.3);
+    }
+    `;
+
+    // Agregar el estilo global después de las otras definiciones
+    useEffect(() => {
+        // Agregar los estilos de animación al documento
+        const style = document.createElement('style');
+        style.textContent = circuitAnimation;
+        document.head.appendChild(style);
+
+        return () => {
+            document.head.removeChild(style);
+        };
+    }, []);
+
     return (
         <div className="flex min-h-screen">
-            <div className="min-h-screen w-full bg-gradient-to-r bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4 md:p-8">
-                <div className="hidden md:flex absolute top-4 -right-24 w-[160px] text-center text-white">
-                    <button
-                        onClick={toggleDarkMode}
-                        className="mr-4 rounded-full p-2 hover:bg-gray-200 dark:hover:bg-white dark:text-[#ffff] text-[#5E3583] dark:hover:text-[#5E3583]"
+            <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={toggleDarkMode}
+                className="absolute top-4 right-4 z-50 rounded-full p-2 bg-white/10 backdrop-blur-sm hover:bg-white/20 dark:text-white text-[#ffffff] transition-all duration-300"
+            >
+                {darkMode ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                )}
+            </motion.button>
+            <div className="min-h-screen w-full bg-gradient-to-br from-[#5E3583] via-[#4A2A6A] to-[#8E6AAF] dark:from-[#2A1B3D] dark:via-[#5E3583] dark:to-[#3D2953] flex items-center justify-center p-4 md:p-8 transition-all duration-500 relative">
+                {/* Fondo de circuito animado */}
+                <div className="absolute inset-0 overflow-hidden opacity-30 dark:opacity-40 pointer-events-none">
+                    <CircuitBackground />
+                </div>
+
+                <AnimatePresence>
+                    <motion.div
+                        initial="hidden"
+                        animate="visible"
+                        variants={fadeIn}
+                        className="relative"
                     >
-                        {darkMode ? (
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                xmlnsXlink="http://www.w3.org/1999/xlink"
-                                aria-hidden="true"
-                                role="img"
-                                className="v-icon notranslate v-theme--dark iconify iconify--mdi"
-                                width="1em"
-                                height="1em"
-                                viewBox="0 0 24 24"
-                                style={{ fontSize: "24px", height: "24px", width: "24px" }}
-                            >
-                                <path
-                                    fill="currentColor"
-                                    d="M12 7a5 5 0 0 1 5 5a5 5 0 0 1-5 5a5 5 0 0 1-5-5a5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3m0-7l2.39 3.42C13.65 5.15 12.84 5 12 5c-.84 0-1.65.15-2.39.42L12 2M3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29L3.34 7m.02 10l1.76-3.77a7.131 7.131 0 0 0 2.38 4.14L3.36 17M20.65 7l-1.77 3.79a7.023 7.023 0 0 0-2.38-4.15l4.15.36m-.01 10l-4.14.36c.59-.51 1.12-1.14 1.54-1.86c.42-.73.69-1.5.83-2.29L20.64 17M12 22l-2.41-3.44c.74.27 1.55.44 2.41.44c.82 0 1.63-.17 2.37-.44L12 22Z"
-                                ></path>
-                            </svg>
-                        ) : (
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                xmlnsXlink="http://www.w3.org/1999/xlink"
-                                aria-hidden="true"
-                                role="img"
-                                className="v-icon notranslate v-theme--light iconify iconify--mdi"
-                                width="1em"
-                                height="1em"
-                                viewBox="0 0 24 24"
-                                style={{ fontSize: "24px", height: "24px", width: "24px" }}
-                            >
-                                <path
-                                    fill="currentColor"
-                                    d="m17.75 4.09l-2.53 1.94l.91 3.06l-2.63-1.81l-2.63 1.81l.91-3.06l-2.53-1.94L12.44 4l1.06-3l1.06 3l3.19.09m3.5 6.91l-1.64 1.25l.59 1.98l-1.7-1.17l-1.7 1.17l.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95l2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85c-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14c.4-.4.82-.76 1.27-1.08c.75-.53 1.93.36 1.85 1.19c-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82c-2.81 3.14-2.7 7.96.31 10.98c3.02 3.01 7.84 3.12 10.98.31Z"
-                                ></path>
-                            </svg>
-                        )}
-                    </button>
-                </div>
-                <div className="md:hidden w-full max-w-sm">
-                    <div className="w-full max-w-[360px] h-[600px] relative bg-gradient-to-r from-[#5E3583] to-[#8E6AAF] rounded-3xl overflow-hidden">
-                        <div className="absolute top-4 right-4 z-50">
-                            <button
-                                onClick={toggleDarkMode}
-                                className="absolute top-4 right-4 rounded-full p-2 hover:bg-gray-200 dark:hover:bg-white text-black dark:hover:text-[#5E3583]"
-                            >
-                                {darkMode ? (
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        xmlnsXlink="http://www.w3.org/1999/xlink"
-                                        aria-hidden="true"
-                                        role="img"
-                                        className="v-icon notranslate v-theme--dark iconify iconify--mdi"
-                                        width="1em"
-                                        height="1em"
-                                        viewBox="0 0 24 24"
-                                        style={{ fontSize: "24px", height: "24px", width: "24px" }}
-                                    >
-                                        <path
-                                            fill="currentColor"
-                                            d="M12 7a5 5 0 0 1 5 5a5 5 0 0 1-5 5a5 5 0 0 1-5-5a5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3m0-7l2.39 3.42C13.65 5.15 12.84 5 12 5c-.84 0-1.65.15-2.39.42L12 2M3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29L3.34 7m.02 10l1.76-3.77a7.131 7.131 0 0 0 2.38 4.14L3.36 17M20.65 7l-1.77 3.79a7.023 7.023 0 0 0-2.38-4.15l4.15.36m-.01 10l-4.14.36c.59-.51 1.12-1.14 1.54-1.86c.42-.73.69-1.5.83-2.29L20.64 17M12 22l-2.41-3.44c.74.27 1.55.44 2.41.44c.82 0 1.63-.17 2.37-.44L12 22Z"
-                                        ></path>
-                                    </svg>
-                                ) : (
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        xmlnsXlink="http://www.w3.org/1999/xlink"
-                                        aria-hidden="true"
-                                        role="img"
-                                        className="v-icon notranslate v-theme--light iconify iconify--mdi"
-                                        width="1em"
-                                        height="1em"
-                                        viewBox="0 0 24 24"
-                                        style={{ fontSize: "24px", height: "24px", width: "24px" }}
-                                    >
-                                        <path
-                                            fill="currentColor"
-                                            d="m17.75 4.09l-2.53 1.94l.91 3.06l-2.63-1.81l-2.63 1.81l.91-3.06l-2.53-1.94L12.44 4l1.06-3l1.06 3l3.19.09m3.5 6.91l-1.64 1.25l.59 1.98l-1.7-1.17l-1.7 1.17l.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95l2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85c-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14c.4-.4.82-.76 1.27-1.08c.75-.53 1.93.36 1.85 1.19c-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82c-2.81 3.14-2.7 7.96.31 10.98c3.02 3.01 7.84 3.12 10.98.31Z"
-                                        ></path>
-                                    </svg>
-                                )}
-                            </button>
-                        </div>
-                        <div className="absolute inset-0 z-0">
-                            <div className="absolute z-50 h-[520px] w-[520px] bg-white -top-[50px] right-[120px] rotate-45 rounded-[0_72px_0_0]" />
 
-                            <div className="absolute z-50 h-[520px] w-[520px] bg-white dark:bg-gray-800 -top-[50px] right-[120px] rotate-45 rounded-[0_72px_0_0]" />
-                            <div className="absolute h-[220px] w-[220px] bg-[#5E3583] -top-[172px] right-0 rotate-45 rounded-[32px]" />
-                            <div className="absolute h-[540px] w-[190px] bg-gradient-to-b from-[#5E3583] to-[#8E6AAF] -top-[24px] right-0 rotate-45 rounded-[32px]" />
-                            <div className="absolute h-[400px] w-[200px] bg-[#5E3583] top-[420px] right-[50px] rotate-45 rounded-[60px]" />
-                        </div>
-                        <div className="relative z-10 h-full">
-                            <form onSubmit={handleSubmit} className="w-[320px] mx-auto pt-[80px] px-[30px]">
-                                <div className="flex justify-between items-center mb-12">
-                                    <div>
-                                        <h1 className="text-4xl font-semibold text-[#5E3583] dark:text-[#BE9FE1]">Hola!</h1>
-                                        <h2 className="text-2xl text-[#5E3583] dark:text-[#BE9FE1]">{getGreeting()}</h2>
-                                    </div>
-                                </div>
-                                <div className="mb-8 relative">
-                                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Correo Electrónico o Usuario
-                                    </label>
-                                    <Input
-                                        id="email"
-                                        type="text"
-                                        placeholder="user@hemmy.com or user123"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        required
-                                    />
-                                </div>
 
-                                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Contraseña
-                                </label>
-                                <div className="mb-8 relative">
-                                    <Input
-                                        id="password"
-                                        type={showPassword ? "text" : "password"}
-                                        placeholder="••••••••"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                    >
-                                        {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-                                    </Button>
-                                </div>
-                                <Button
-                                    type="submit"
-                                    className="w-full bg-[#5E3583] text-white hover:bg-[#4A2A6A] dark:bg-[#8E6AAF] dark:text-gray-900 dark:hover:bg-[#BE9FE1]"
-                                    disabled={isLoading}
+                        <div className="md:hidden">
+                            <motion.div
+                                initial="hidden"
+                                animate="visible"
+                                variants={fadeIn}
+                                className="w-full max-w-[360px] h-[600px] relative bg-gradient-to-r from-[#5E3583] to-[#8E6AAF] rounded-3xl overflow-hidden shadow-2xl backdrop-blur-sm"
+                            >
+                                <motion.form
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.3, duration: 0.5 }}
+                                    onSubmit={handleSubmit}
+                                    className="w-[320px] mx-auto pt-[80px] px-[30px]"
                                 >
-                                    {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
-                                </Button>
-                            </form>
-
-                            <div className="absolute bottom-0 right-0 h-[140px] w-[160px] text-center text-white">
-                                <div className="absolute bottom-12 right-11">
-                                    <div className="flex justify-center items-center bg-white rounded-full w-16 h-16 shadow-lg">
-                                        <img src="/logos/logo_grupo_hemmy.jpg" alt="Hemmy logo" className="h-12 w-12 object-contain" />
+                                    <div className="flex justify-between items-center mb-12">
+                                        <div>
+                                            <motion.h1
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: 0.4 }}
+                                                className="text-4xl font-semibold text-white"
+                                            >
+                                                ¡Hola!
+                                            </motion.h1>
+                                            <motion.h2
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: 0.5 }}
+                                                className="text-2xl text-white/90"
+                                            >
+                                                {getGreeting()}
+                                            </motion.h2>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <Card className="hidden md:grid w-full border-none max-w-4xl md:grid-cols-2 overflow-hidden shadow-lg">
-                    <div className="relative bg-gradient-to-r from-[#5E3583] dark:from-[#8E6AAF] dark:to-[#5E3583] to-[#8E6AAF] p-8 flex flex-col text-white">
-                        <div className="absolute inset-0 overflow-hidden">
-                            <div className="absolute inset-0 bg-[#2A143E] opacity-80" />
-                            <div className="absolute top-1/4 left-1/4 w-16 h-16 rounded-full bg-[#BE9FE1]" />
-                            <div className="absolute inset-0 opacity-75">
-                                {Array.from({ length: 20 }).map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className="absolute w-1 h-1 bg-white rounded-full animate-twinkle"
-                                        style={{
-                                            top: `${Math.random() * 100}%`,
-                                            left: `${Math.random() * 100}%`,
-                                            animationDelay: `${Math.random() * 2}s`,
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                            <div
-                                className="absolute w-20 h-0.5 bg-[#BE9FE1] rotate-45 animate-shooting-star"
-                                style={{ top: "20%", left: "60%" }}
-                            />
-                            <div
-                                className="absolute w-16 h-0.5 bg-[#BE9FE1] rotate-45 animate-shooting-star"
-                                style={{ top: "40%", left: "70%" }}
-                            />
-                        </div>
-
-                        <div className="flex justify-center items-center">
-                            <img src="/logos/grupo_hemmy.jpg" alt="Background" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="relative mt-auto space-y-2">
-    
-                            <p className="text-xs text-[#D0BFEA]">
-                                Nacimos para innovar
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
-                        <div className="flex justify-between items-center mb-8">
-                            <div>
-                                <h1 className="text-2xl font-semibold text-[#5E3583] dark:text-[#BE9FE1]">Hola!</h1>
-                                <h2 className="text-xl text-[#5E3583] dark:text-[#BE9FE1]">{getGreeting()}</h2>
-                            </div>
-                            <img src="/logos/logo_grupo_hemmy.jpg" alt="Hemmy Logo" className="w-14 h-14" />
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-medium text-[#5E3583] dark:text-[#BE9FE1] text-center">
-                                    Inicie sesión en su cuenta
-                                </h3>
-                                <form onSubmit={handleSubmit} className="space-y-4">
-                                    <div>
-                                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Correo Electrónico o Usuario
-                                        </label>
-                                        <Input
-                                            id="email"
-                                            type="text"
-                                            placeholder="user@hemmy.com or user123"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            required
-                                            className="mt-1 w-full dark:bg-gray-700 dark:text-gray-300"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Contraseña
-                                        </label>
-                                        <div className="mb-8 relative">
+                                    <motion.div
+                                        className="space-y-6"
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.6 }}
+                                    >
+                                        <motion.div
+                                            className="mb-8 relative"
+                                            whileHover="hover"
+                                            whileFocus="focus"
+                                            variants={inputVariants}
+                                        >
+                                            <label className="block text-sm font-medium text-white/90 mb-2">
+                                                Correo Electrónico o Usuario
+                                            </label>
                                             <Input
+                                                id="email"
+                                                type="text"
+                                                placeholder="user@hemmy.com or user123"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                required
+                                                className="transition-all duration-300 focus:ring-2 focus:ring-[#5E3583] dark:focus:ring-[#BE9FE1] bg-white/10 border-white/20 text-white placeholder-white/50"
+                                            />
+                                        </motion.div>
+
+                                        <motion.div
+                                            className="relative"
+                                            whileHover="hover"
+                                            whileFocus="focus"
+                                            variants={inputVariants}
+                                        >
+                                            <label className="block text-sm font-medium text-white/90 mb-2">
+                                                Contraseña
+                                            </label>
+                                            <TypewriterInput
                                                 id="password"
                                                 type={showPassword ? "text" : "password"}
                                                 placeholder="••••••••"
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
                                                 required
-                                                className="mt-1 w-full dark:bg-gray-700 dark:text-gray-300"
+                                                className="transition-all duration-300 focus:ring-2 focus:ring-[#5E3583] dark:focus:ring-[#BE9FE1] bg-white/10 border-white/20 text-white placeholder-white/50"
                                             />
-                                            <Button
+                                            <motion.button
                                                 type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="absolute right-2 top-1/2 -translate-y-1/2"
+                                                // variants={buttonVariants}
+                                                whileHover="hover"
+                                                whileTap="tap"
+                                                className="absolute right-2 top-1/2 p-2 rounded-full hover:bg-violet-50 text-violet-700/70 dark:text-white/0 transition-colors duration-300"
                                                 onClick={() => setShowPassword(!showPassword)}
                                             >
                                                 {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-end">
-                                        <Link href="#" className="text-sm text-[#5E3583] dark:text-[#BE9FE1] hover:text-[#4A2A6A] dark:hover:text-[#D0BFEA]">
-                                            ¿Olvidaste tu contraseña?
-                                        </Link>
-                                    </div>
-                                    <Button
-                                        type="submit"
-                                        className="w-full bg-[#5E3583] text-white hover:bg-[#4A2A6A] dark:bg-[#8E6AAF] dark:text-gray-900 dark:hover:bg-[#BE9FE1]"
-                                        disabled={isLoading}
-                                    >
-                                        {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
-                                    </Button>
-                                </form>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-sm text-[#5E3583] dark:text-[#BE9FE1]">
-                                    ¿No tienes una cuenta?{" "}
-                                    <Link href="/register" className="text-[#5E3583] font-semibold hover:text-[#4A2A6A] dark:text-[#BE9FE1] dark:hover:text-[#D0BFEA]">
-                                        Crear Cuenta
-                                    </Link>
-                                </p>
-                            </div>
+                                            </motion.button>
+                                        </motion.div>
+
+                                        <motion.button
+                                            variants={buttonVariants}
+                                            whileHover="hover"
+                                            whileTap="tap"
+                                            type="submit"
+                                            className="w-full bg-white text-[#5E3583] hover:bg-white/90 transition-all duration-300 py-3 px-4 rounded-lg font-medium shadow-lg"
+                                            disabled={isLoading}
+                                        >
+                                            {isLoading ? (
+                                                <motion.div
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    className="flex items-center justify-center"
+                                                >
+                                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-[#5E3583]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    Iniciando sesión...
+                                                </motion.div>
+                                            ) : (
+                                                "Iniciar Sesión"
+                                            )}
+                                        </motion.button>
+                                    </motion.div>
+                                </motion.form>
+
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.7 }}
+                                    className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center"
+                                >
+                                    <img src="/logos/logo_grupo_hemmy.jpg" alt="Hemmy logo" className="h-16 w-16 mx-auto rounded-full shadow-lg" />
+                                </motion.div>
+                            </motion.div>
                         </div>
-                    </div>
-                </Card>
+
+                        <animated.div style={springProps} className="hidden md:block">
+                            <Card className="w-full border-none max-w-4xl grid md:grid-cols-2 overflow-hidden shadow-2xl backdrop-blur-sm">
+                                <div className="relative bg-gradient-to-r from-[#5E3583] to-[#8E6AAF] p-8 flex flex-col text-white overflow-hidden">
+                                    <motion.div
+                                        className="absolute inset-0"
+                                        animate={{
+                                            background: [
+                                                "linear-gradient(45deg, rgba(94, 53, 131, 0.9) 0%, rgba(142, 106, 175, 0.9) 100%)",
+                                                "linear-gradient(45deg, rgba(142, 106, 175, 0.9) 0%, rgba(94, 53, 131, 0.9) 100%)"
+                                            ]
+                                        }}
+                                        transition={{ duration: 5, repeat: Infinity, repeatType: "reverse" }}
+                                    />
+
+                                    <motion.div
+                                        initial={{ scale: 0.8, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        transition={{ duration: 0.5 }}
+                                        className="relative z-10 flex flex-col items-center justify-center h-full"
+                                    >
+                                        <img
+                                            src="/logos/grupo_hemmy.jpg"
+                                            alt="Background"
+                                            className="w-64 h-64 object-cover rounded-full shadow-2xl transform hover:scale-105 transition-transform duration-300"
+                                        />
+                                        <motion.p
+                                            initial={{ y: 20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            transition={{ delay: 0.3 }}
+                                            className="mt-8 text-xl font-medium text-white"
+                                        >
+                                            Nacimos para innovar
+                                        </motion.p>
+                                    </motion.div>
+                                </div>
+
+                                <motion.div
+                                    initial={{ x: 20, opacity: 0 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    transition={{ delay: 0.2 }}
+                                    className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg"
+                                >
+                                    <motion.div
+                                        initial={{ y: -20, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        transition={{ delay: 0.3 }}
+                                        className="flex justify-between items-center mb-8"
+                                    >
+                                        <div>
+                                            <h1 className="text-2xl font-semibold text-[#5E3583] dark:text-[#BE9FE1]">¡Hola!</h1>
+                                            <h2 className="text-xl text-[#5E3583] dark:text-[#BE9FE1]">{getGreeting()}</h2>
+                                        </div>
+                                        <img src="/logos/logo_grupo_hemmy.jpg" alt="Hemmy Logo" className="w-14 h-14 rounded-full shadow-lg" />
+                                    </motion.div>
+
+                                    <motion.form
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.4 }}
+                                        onSubmit={handleSubmit}
+                                        className="space-y-6"
+                                    >
+                                        <motion.div
+                                            className="space-y-4"
+                                            initial={{ y: 20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            transition={{ delay: 0.5 }}
+                                        >
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                    Correo Electrónico o Usuario
+                                                </label>
+                                                <Input
+                                                    id="email"
+                                                    type="text"
+                                                    placeholder="user@hemmy.com or user123"
+                                                    value={email}
+                                                    onChange={(e) => setEmail(e.target.value)}
+                                                    required
+                                                    className="w-full transition-all duration-300 focus:ring-2 focus:ring-[#5E3583] dark:focus:ring-[#BE9FE1]"
+                                                />
+                                            </div>
+
+                                            <div className="relative">
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                    Contraseña
+                                                </label>
+                                                <TypewriterInput
+                                                    id="password"
+                                                    type={showPassword ? "text" : "password"}
+                                                    placeholder="••••••••"
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    required
+                                                    className="w-full transition-all duration-300 focus:ring-2 focus:ring-[#5E3583] dark:focus:ring-[#BE9FE1]"
+                                                />
+                                                <motion.button
+                                                    type="button"
+                                                    // variants={buttonVariants}
+                                                    whileHover="hover"
+                                                    whileTap="tap"
+                                                    className="absolute right-2 top-1/2 p-2 rounded-full hover:bg-violet-50 text-violet-700/70 dark:text-white/70 transition-colors duration-300"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                >
+                                                    {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                                                </motion.button>
+                                            </div>
+
+                                            <div className="flex justify-end">
+                                                <Link
+                                                    href="#"
+                                                    className="text-sm text-[#5E3583] dark:text-[#BE9FE1] hover:text-[#4A2A6A] dark:hover:text-[#D0BFEA] transition-colors duration-300"
+                                                >
+                                                    ¿Olvidaste tu contraseña?
+                                                </Link>
+                                            </div>
+
+                                            <motion.button
+                                                variants={buttonVariants}
+                                                whileHover="hover"
+                                                whileTap="tap"
+                                                type="submit"
+                                                className="w-full bg-[#5E3583] text-white hover:bg-[#4A2A6A] dark:bg-[#8E6AAF] dark:text-gray-900 dark:hover:bg-[#BE9FE1] transition-all duration-300 py-3 px-4 rounded-lg font-medium shadow-lg"
+                                                disabled={isLoading}
+                                            >
+                                                {isLoading ? (
+                                                    <motion.div
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        className="flex items-center justify-center"
+                                                    >
+                                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        Iniciando sesión...
+                                                    </motion.div>
+                                                ) : (
+                                                    "Iniciar Sesión"
+                                                )}
+                                            </motion.button>
+                                        </motion.div>
+                                    </motion.form>
+
+                                    <motion.div
+                                        initial={{ y: 20, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        transition={{ delay: 0.6 }}
+                                        className="mt-6 text-center"
+                                    >
+                                        <p className="text-sm text-[#5E3583] dark:text-[#BE9FE1]">
+                                            ¿No tienes una cuenta?{" "}
+                                            <Link
+                                                href="/register"
+                                                className="font-semibold hover:text-[#4A2A6A] dark:hover:text-[#D0BFEA] transition-colors duration-300"
+                                            >
+                                                Crear Cuenta
+                                            </Link>
+                                        </p>
+                                    </motion.div>
+                                </motion.div>
+                            </Card>
+                        </animated.div>
+                    </motion.div>
+                </AnimatePresence>
             </div>
+            <style jsx global>{`
+                @keyframes pulse {
+                  0%, 100% { opacity: 0.5; }
+                  50% { opacity: 1; }
+                }
+                @keyframes flow {
+                  0% { stroke-dashoffset: 1000; }
+                  100% { stroke-dashoffset: 0; }
+                }
+                @keyframes glow {
+                  0%, 100% { filter: drop-shadow(0 0 2px #5E3583); }
+                  50% { filter: drop-shadow(0 0 8px #7B4397); }
+                }
+                .circuit-path {
+                  stroke-dasharray: 1000;
+                  stroke-dashoffset: 1000;
+                  animation: flow 20s linear infinite;
+                }
+                .circuit-node {
+                  animation: glow 2s ease-in-out infinite;
+                }
+            `}</style>
         </div>
     )
 }

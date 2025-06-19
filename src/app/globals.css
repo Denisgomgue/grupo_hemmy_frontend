@@ -115,6 +115,7 @@
     @apply bg-background text-foreground;
     font-family: 'Nunito', sans-serif;
     overflow: hidden;
+    outline: violet;
   }
 }
 
@@ -151,5 +152,5 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(177.22, 80.75%, 36.67%) ;
+  background: hsl(278, 75%, 38%) ;
 }

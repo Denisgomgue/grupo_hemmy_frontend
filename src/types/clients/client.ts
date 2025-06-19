@@ -30,6 +30,7 @@ export interface Client {
     description?: string;
     routerSerial?: string;
     decoSerial?: string;
+    ipAddress?: string;
     paymentStatus: PaymentStatus;
     status: AccountStatus;
     plan?: Plan;

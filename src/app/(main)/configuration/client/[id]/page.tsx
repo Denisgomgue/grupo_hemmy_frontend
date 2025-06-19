@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { type ElementRef, type ComponentPropsWithoutRef, useEffect, useState, useRef, forwardRef } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Edit, CreditCard, Ticket, MapPin, User as UserIcon } from "lucide-react"
+import { ArrowLeft, Edit, CreditCard, Ticket, MapPin, User as UserIcon, Phone, MessageSquare, Image, X, ZoomIn, ZoomOut, RotateCw, Download, Hand } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -17,11 +17,13 @@ import api from "@/lib/axios"
 import { type Client, AccountStatus, PaymentStatus as ClientPaymentStatus } from "@/types/clients/client"
 import { type Payment, PaymentStatus, PaymentType } from "@/types/payments/payment"
 import { getPaymentStatusLabel } from "@/utils/payment-status-labels"
-import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog"
+import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogHeader, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { PaymentForm } from "@/app/(main)/configuration/payment/_components/payment-form"
 import { getAccountStatusLabel } from "@/utils/account-status-labels"
 import { getClientPaymentStatusLabel } from "@/utils/client-payment-status-labels"
 import { PaymentDetailModal } from "@/components/payment/payment-detail-modal"
+import { ClientImageFill } from "@/components/ui/client-image"
+import { cn } from "@/lib/utils"
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -34,6 +36,13 @@ export default function ClientDetailPage() {
   const [ isPaymentModalOpen, setIsPaymentModalOpen ] = useState(false)
   const [ selectedPayment, setSelectedPayment ] = useState<Payment | null>(null)
   const [ isPaymentDetailModalOpen, setIsPaymentDetailModalOpen ] = useState(false)
+  const [ isImageModalOpen, setIsImageModalOpen ] = useState(false)
+  const [ imageZoom, setImageZoom ] = useState(1)
+  const [ imageRotation, setImageRotation ] = useState(0)
+  const [ isDragging, setIsDragging ] = useState(false)
+  const [ dragPosition, setDragPosition ] = useState({ x: 0, y: 0 })
+  const [ isPanning, setIsPanning ] = useState(false)
+  const dragRef = useRef({ startX: 0, startY: 0 })
 
   const fetchClientPayments = async () => {
     if (!id) return
@@ -246,6 +255,83 @@ export default function ClientDetailPage() {
     }
   }
 
+  const handleImageModalClose = () => {
+    setIsImageModalOpen(false)
+    setImageZoom(1)
+    setImageRotation(0)
+    setDragPosition({ x: 0, y: 0 })
+  }
+
+  const handleZoomIn = () => {
+    setImageZoom(prev => Math.min(prev + 0.25, 3))
+  }
+
+  const handleZoomOut = () => {
+    setImageZoom(prev => Math.max(prev - 0.25, 0.5))
+  }
+
+  const handleRotate = () => {
+    setImageRotation(prev => (prev + 90) % 360)
+  }
+
+  const handleDownload = () => {
+    if (client?.referenceImage) {
+      const link = document.createElement('a')
+      link.href = typeof client.referenceImage === 'string' ? client.referenceImage : URL.createObjectURL(client.referenceImage)
+      link.download = `imagen_referencia_${client.name}_${client.lastName}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  }
+
+  const handlePanStart = () => {
+    setIsPanning(!isPanning)
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!isPanning) return
+    setIsDragging(true)
+    dragRef.current = {
+      startX: e.clientX - dragPosition.x,
+      startY: e.clientY - dragPosition.y
+    }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !isPanning) return
+    setDragPosition({
+      x: e.clientX - dragRef.current.startX,
+      y: e.clientY - dragRef.current.startY
+    })
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  const resetImageControls = () => {
+    setImageZoom(1)
+    setImageRotation(0)
+    setDragPosition({ x: 0, y: 0 })
+  }
+
+  // Función para generar el enlace de WhatsApp
+  const getWhatsAppLink = (phone: string) => {
+    // Limpiamos el número de teléfono de cualquier carácter no numérico
+    const cleanPhone = phone?.replace(/\D/g, '');
+    // Si el número no empieza con el código de país, agregamos +51 (Perú)
+    const fullPhone = cleanPhone?.startsWith('51') ? cleanPhone : `51${cleanPhone}`;
+    return `https://wa.me/${fullPhone}`;
+  };
+
+  // Función para manejar la llamada telefónica
+  const handlePhoneCall = () => {
+    if (client?.phone) {
+      window.location.href = `tel:${client.phone}`;
+    }
+  };
+
   if (isLoading) {
     return <ClientDetailSkeleton />
   }
@@ -278,107 +364,187 @@ export default function ClientDetailPage() {
 
       <div className="grid md:grid-cols-2 gap-6 mb-6">
         {/* Personal Information Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <UserIcon className="h-5 w-5 text-muted-foreground" /> Información Personal
+        <Card className="overflow-hidden border-none shadow-md bg-white hover:shadow-lg transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 border-b bg-gray-50/50">
+            <CardTitle className="text-xl flex items-center gap-2 text-gray-700">
+              <UserIcon className="h-5 w-5 text-purple-800" /> Información Personal
             </CardTitle>
-            <Button variant="ghost" size="icon" onClick={handleEdit}>
+            <Button variant="ghost" size="icon" onClick={handleEdit} className="hover:bg-purple-100 hover:text-purple-600">
               <Edit className="h-4 w-4" />
             </Button>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="flex items-start gap-4 mb-6">
-              <Avatar className="h-16 w-16 text-2xl">
-                <AvatarFallback>{initial}</AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="text-xl font-semibold">
-                  {client.name} {client.lastName}
-                </h3>
-                <p className="text-muted-foreground">{client.dni}</p>
+            {/* Información Personal Header */}
+            <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16 text-2xl ring-2 ring-purple-200 ring-offset-2">
+                  <AvatarFallback className="bg-purple-200 text-purple-900">{initial}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-800">
+                    {client.name} {client.lastName}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-gray-500 font-medium">{client.dni}</span>
+                    <Badge variant={getStatusVariant(client.status)} className="font-medium text-xs px-2 py-0.5">
+                      {getAccountStatusLabel(client.status)}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="hover:bg-purple-100 hover:text-purple-600 transition-colors"
+                  onClick={handlePhoneCall}
+                >
+                  <Phone className="h-4 w-4" />
+                </Button>
+                <a
+                  href={getWhatsAppLink(client?.phone || '')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:no-underline"
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hover:bg-[#25D366] hover:text-white hover:border-[#25D366] transition-colors"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </Button>
+                </a>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Teléfono</p>
-                <p className="font-medium">{client.phone || "N/A"}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Estado</p>
+            {/* Grid de información principal */}
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="col-span-2 space-y-1">
+                <p className="text-sm font-medium text-gray-500">Dirección</p>
                 <div className="flex items-center gap-2">
-                  <Badge variant={getStatusVariant(client.status)}>
-                    {getAccountStatusLabel(client.status)}
-                  </Badge>
-                  <Badge variant={getPaymentStatusVariant(client.paymentStatus)}>
-                    {getClientPaymentStatusLabel(client.paymentStatus)}
-                  </Badge>
+                  <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <p className="font-medium text-gray-700">{client.address || "Sin dirección registrada"}</p>
                 </div>
               </div>
-              <div className="col-span-2">
-                <p className="text-sm text-muted-foreground">Dirección</p>
-                <p className="font-medium">{client.address || "Sin dirección registrada"}</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Teléfono</p>
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <p className="font-medium text-gray-700">{client.phone || "N/A"}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Sector</p>
-                <p className="font-medium">{client.sector?.name || "N/A"}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Renta</p>
-                <p className="font-medium">{client.advancePayment ? "Adelantada" : "Pendiente"}</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Sector</p>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <p className="font-medium text-gray-700">{client.sector?.name || "N/A"}</p>
+                </div>
               </div>
             </div>
+
+            {/* Grid de estados */}
+            <div className="grid grid-cols-2 gap-6 mb-6 pb-4 border-b">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-500">Estado de Pago</p>
+                <Badge
+                  variant={getPaymentStatusVariant(client.paymentStatus)}
+                  className="font-medium px-3 py-1 text-xs"
+                >
+                  {getClientPaymentStatusLabel(client.paymentStatus)}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-500">Renta</p>
+                <Badge
+                  variant={client.advancePayment ? "outline" : "secondary"}
+                  className="font-medium px-3 py-1 text-xs"
+                >
+                  {client.advancePayment ? "Adelantada" : "Sin adelanto"}
+                </Badge>
+              </div>
+            </div>
+
+            {/* Botón de imagen de referencia */}
+            <Button
+              variant="outline"
+              className="w-full border-2 border-purple-800/30 text-purple-800 hover:bg-purple-100 hover:text-purple-700 hover:border-purple-800 transition-colors duration-200 font-medium"
+              onClick={() => setIsImageModalOpen(true)}
+            >
+              <Image className="mr-2 h-4 w-4" />
+              Ver Imagen de Referencia
+            </Button>
           </CardContent>
         </Card>
 
         {/* Service Information Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-muted-foreground" /> Información del Servicio
+        <Card className="overflow-hidden border-none shadow-md bg-white hover:shadow-lg transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 border-b bg-gray-50/50">
+            <CardTitle className="text-xl flex items-center gap-2 text-gray-700">
+              <CreditCard className="h-5 w-5 text-purple-800" /> Información del Servicio
             </CardTitle>
-            <Button variant="ghost" size="icon" onClick={handleEdit}>
+            <Button variant="ghost" size="icon" onClick={handleEdit} className="hover:bg-purple-100 hover:text-purple-600">
               <Edit className="h-4 w-4" />
             </Button>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div>
-                <p className="text-sm text-muted-foreground">Tipo de Servicio</p>
-                <p className="font-medium flex items-center gap-2">{client.plan?.service?.name || "N/A"}</p>
+            {/* Grid de información principal del servicio */}
+            <div className="grid grid-cols-2 gap-6 mb-6 pb-4 border-b">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Plan Actual</p>
+                <p className="font-medium text-gray-700">{client.plan?.name || "N/A"} - S/ {client.plan?.price || "0.00"} /mes</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Velocidad</p>
-                <p className="font-medium">{client.plan?.speed || "N/A"} Mbps</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Tipo de Servicio</p>
+                <p className="font-medium text-gray-700">{client.plan?.service?.name || "N/A"}</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Fecha de Instalación</p>
-                <p className="font-medium">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Velocidad</p>
+                <p className="font-medium text-gray-700">{client.plan?.speed || "N/A"} Mbps</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Dirección IP</p>
+                <p className="font-medium text-gray-700 font-mono">{client.ipAddress || "N/A"}</p>
+              </div>
+            </div>
+
+            {/* Grid de fechas */}
+            <div className="grid grid-cols-2 gap-6 mb-6 pb-4 border-b">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Fecha de Instalación</p>
+                <p className="font-medium text-gray-700">
                   {client.installationDate
                     ? format(new Date(client.installationDate), "dd/MM/yyyy", { locale: es })
                     : "N/A"}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Próximo Pago</p>
-                <p className="font-medium">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Próximo Pago</p>
+                <p className="font-medium text-gray-700">
                   {client.paymentDate ? format(new Date(client.paymentDate), "dd/MM/yyyy", { locale: es }) : "N/A"}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Plan</p>
-                <p className="font-medium">{client.plan?.name || "N/A"}</p>
+            </div>
+
+            {/* Grid de información técnica */}
+            <div className="grid grid-cols-2 gap-6 mb-6 pb-4 border-b">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Serie Router</p>
+                <p className="font-medium text-gray-700 font-mono">{client.routerSerial || "N/A"}</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Precio Mensual</p>
-                <p className="font-medium">S/ {client.plan?.price || "0.00"}</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-500">Serie Decodificador</p>
+                <p className="font-medium text-gray-700 font-mono">{client.decoSerial || "N/A"}</p>
               </div>
             </div>
 
+            {/* Botón de registro de pago */}
             <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
               <DialogTrigger asChild>
-                <Button className="w-full" onClick={handleOpenPaymentModal}>
+                <Button
+                  className="w-full text-white font-medium"
+                  onClick={handleOpenPaymentModal}
+                >
                   <CreditCard className="mr-2 h-4 w-4" /> Registrar Pago
                 </Button>
               </DialogTrigger>
@@ -407,13 +573,14 @@ export default function ClientDetailPage() {
                       address: client.address || '',
                       installationDate: client.installationDate,
                       reference: client.reference,
-                      referenceImage: client.referenceImage,
+                      referenceImage: client.referenceImage || '',
                       initialPaymentDate: client.initialPaymentDate,
                       paymentDate: client.paymentDate,
                       advancePayment: client.advancePayment || false,
                       description: client.description || '',
                       routerSerial: client.routerSerial || '',
                       decoSerial: client.decoSerial || '',
+                      ipAddress: client.ipAddress || '',
                       paymentStatus: client.paymentStatus,
                       status: client.status,
                       plan: client.plan,
@@ -538,9 +705,117 @@ export default function ClientDetailPage() {
           isOpen={isPaymentDetailModalOpen}
           onClose={handleClosePaymentDetailModal}
           onEdit={handleEditPayment}
-          onDelete={handleDeletePayment}
+        // onDelete={handleDeletePayment}
         />
       )}
+
+      {/* Modal del visor de imagen */}
+      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+        <DialogContent
+          className="w-full max-w-6xl h-[90vh] p-0 overflow-hidden [&>button]:hidden"
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          <DialogHeader className="flex flex-row items-center justify-between p-6 border-b">
+            <DialogTitle className="text-xl font-semibold">Imagen de Referencia</DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomOut}
+                disabled={imageZoom <= 0.5}
+                className="h-8 w-8 p-0"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[60px] text-center">
+                {Math.round(imageZoom * 100)}%
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomIn}
+                disabled={imageZoom >= 3}
+                className="h-8 w-8 p-0"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRotate}
+                className="h-8 w-8 p-0"
+              >
+                <RotateCw className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownload}
+                className="h-8 w-8 p-0"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePanStart}
+                className={`h-8 w-8 p-0 ${isPanning ? 'bg-purple-100 border-purple-600 text-purple-600' : ''}`}
+              >
+                <Hand className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetImageControls}
+                className="h-8 px-3 text-xs"
+              >
+                Reset
+              </Button>
+              <DialogClose asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImageModalClose}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 h-[calc(90vh-80px)] overflow-hidden bg-gray-100">
+            <div
+              className="flex items-center justify-center w-full h-full"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              style={{ cursor: isPanning ? 'grab' : 'default' }}
+            >
+              <div
+                className="relative bg-white rounded-lg shadow-lg overflow-hidden w-full h-full max-h-[calc(90vh-120px)]"
+                style={{
+                  transform: `translate(${dragPosition.x}px, ${dragPosition.y}px) scale(${imageZoom}) rotate(${imageRotation}deg)`,
+                  transition: isDragging ? 'none' : 'transform 0.2s ease-in-out'
+                }}
+              >
+                <div className="relative w-full h-full">
+                  <ClientImageFill
+                    imagePath={client?.referenceImage}
+                    alt="Imagen de Referencia del Cliente"
+                    className="w-full h-full"
+                    fallbackText={client?.referenceImage instanceof File ? 'Archivo seleccionado' : 'Sin imagen'}
+                    sizes="(max-width: 1200px) 100vw, 1200px"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogDescription className="sr-only">
+            Visualizador de imagen de referencia del cliente con controles de zoom y rotación
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

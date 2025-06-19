@@ -32,6 +32,7 @@ export const ClientSchema = z.object({
     paymentStatus: PaymentStatusEnum.optional(),
     decoSerial: z.string().optional().or(z.literal('')),
     routerSerial: z.string().optional().or(z.literal('')),
+    ipAddress: z.string().optional().or(z.literal('')),
     referenceImage: FileSchema,
 }).refine((data) => {
     if (!data.paymentDate) return true;
