@@ -14,19 +14,25 @@ export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
         return {
           label: getPaymentStatusLabel(status),
           variant: "success" as const,
-          className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+          className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 w-fit",
         }
       case "PENDING":
         return {
           label: getPaymentStatusLabel(status),
           variant: "secondary" as const,
-          className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+          className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100 w-fit",
         }
       case "LATE_PAYMENT":
         return {
           label: getPaymentStatusLabel(status),
           variant: "destructive" as const,
-          className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
+          className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100 w-fit",
+        }
+      case "VOIDED":
+        return {
+          label: getPaymentStatusLabel(status),
+          variant: "outline" as const,
+          className: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 w-fit",
         }
       default:
         return {

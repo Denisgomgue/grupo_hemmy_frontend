@@ -18,7 +18,7 @@ export function InfoCardShell({
 }: InfoCardShellProps) {
     return (
         <div className={cn(
-            "p-4 border rounded-lg shadow-sm mb-4 bg-card text-card-foreground", // Estilos base
+            "p-4 border rounded-lg shadow-sm mb-4 text-card-foreground", // Estilos base
             className // Clases personalizadas
         )}>
             {/* Renderizar Sección Superior */}

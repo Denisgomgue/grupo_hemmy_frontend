@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
+import { formatDateForDisplay, createDateFromString, calculateNextPaymentDateForDisplay } from "@/lib/utils"
 import { Wifi, Zap, Settings, HelpCircle } from "lucide-react";
 import { ClientActionsDropdown } from "./client-actions-dropdown";
 import { InfoCardShell } from "./info-card-shell";
@@ -13,10 +14,10 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { getAccountStatusLabel } from "@/utils/account-status-labels";
 import { getClientPaymentStatusLabel } from "@/utils/client-payment-status-labels";
 import Link from "next/link";
-import { getDisplayPaymentDate } from "@/utils/date-utils";
+// Importación removida - función no existe
 import { ClientImageFill } from "@/components/ui/client-image";
 
-// --- Helpers (Movidos aquí desde headers.tsx) ---
+// --- Helpers ---
 
 const getAccountStatusVariant = (status: AccountStatus): "accountSuccess" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -42,34 +43,40 @@ const getPaymentStatusVariant = (status: PaymentStatus): "success" | "secondary"
     }
 }
 
+// Helper para obtener la instalación principal del cliente
+const getMainInstallation = (client: Client) => {
+    return client.installations?.[ 0 ] || null;
+}
+
+// Helper para obtener el estado de pago usando la misma lógica del card
 const getPaymentStatus = (client: Client): { text: string; variant: "success" | "warning" | "destructive" | "outline" } => {
-    if (!client.paymentDate && !client.initialPaymentDate) return { text: "N/D", variant: "outline" };
+    const installation = getMainInstallation(client);
+    const paymentConfig = installation?.paymentConfig;
 
-    const { date: nextPaymentDate, isFromInitial } = getDisplayPaymentDate(client);
-    if (nextPaymentDate === "No definida") return { text: "N/D", variant: "outline" };
+    if (!paymentConfig?.paymentStatus) {
+        return { text: "N/D", variant: "outline" };
+    }
 
-    const paymentDate = new Date(nextPaymentDate.split('/').reverse().join('-'));
-    const today = new Date();
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(today.getDate() + 7);
-
-    paymentDate.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    sevenDaysFromNow.setHours(0, 0, 0, 0);
-
-    if (paymentDate < today) {
-        return { text: "En mora", variant: "destructive" };
-    } else if (paymentDate >= today && paymentDate <= sevenDaysFromNow) {
-        return { text: "Por vencer", variant: "warning" };
-    } else {
-        return { text: "Al día", variant: "success" };
+    // Usar el paymentStatus del backend que ya está calculado correctamente
+    switch (paymentConfig.paymentStatus) {
+        case 'PAID':
+            return { text: "Al día", variant: "success" };
+        case 'EXPIRING':
+            return { text: "Por vencer", variant: "warning" };
+        case 'EXPIRED':
+            return { text: "Vencido", variant: "destructive" };
+        case 'SUSPENDED':
+            return { text: "Suspendido", variant: "destructive" };
+        default:
+            return { text: "N/D", variant: "outline" };
     }
 };
 
 const getServiceIcon = (serviceName: string | undefined) => {
-    if (!serviceName) return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
-    if (serviceName.toLowerCase().includes("fibra")) return <Zap className="h-4 w-4 text-blue-500" />;
-    if (serviceName.toLowerCase().includes("inalámbrico")) return <Wifi className="h-4 w-4 text-sky-500" />;
+    if (!serviceName || serviceName.trim() === '') return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
+    const serviceLower = serviceName.toLowerCase().trim();
+    if (serviceLower.includes("fibra") || serviceLower.includes("fiber")) return <Zap className="h-4 w-4 text-blue-500" />;
+    if (serviceLower.includes("inalambrico") || serviceLower.includes("Internet Inalambrico") || serviceLower.includes("wifi")) return <Wifi className="h-4 w-4 text-sky-500" />;
     return <Settings className="h-4 w-4 text-muted-foreground" />;
 }
 
@@ -91,6 +98,20 @@ const getAvatarColor = (name: string): string => {
     return colors[ seed % colors.length ];
 };
 
+// Helper para obtener el color del contorno del avatar según el estado del cliente
+const getAvatarBorderColor = (status: AccountStatus): string => {
+    switch (status) {
+        case AccountStatus.ACTIVE:
+            return "ring-2 ring-purple-600 ring-offset-2";
+        case AccountStatus.SUSPENDED:
+            return "ring-2 ring-red-500 ring-offset-2";
+        case AccountStatus.INACTIVE:
+            return "ring-2 ring-black ring-offset-2";
+        default:
+            return "ring-2 ring-gray-400 ring-offset-2";
+    }
+}
+
 // --- Definición del Componente Card ---
 
 interface ClientCardProps {
@@ -102,10 +123,13 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
     if (!client) return null;
 
     const initial = client.name ? client.name[ 0 ].toUpperCase() : "?";
-    const avatarColor = getAvatarColor(client.name + client.lastName);
+    const avatarColor = getAvatarColor((client.name || "") + (client.lastName || ""));
     const paymentInfo = getPaymentStatus(client);
     const paymentBadgeVariant = paymentInfo.variant === 'warning' ? 'secondary' : paymentInfo.variant;
-    const clientOwnPaymentStatus = client.paymentStatus;
+    const installation = getMainInstallation(client);
+    const plan = installation?.plan;
+
+
 
     const topSectionContent = (
         <div className="flex items-center justify-between mb-4">
@@ -114,16 +138,16 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
                 className="flex-1 hover:bg-purple-100 rounded-lg transition-colors p-2 -m-2"
             >
                 <div className="flex items-center gap-3">
-                    <Avatar className={`h-9 w-9 text-sm ${avatarColor} text-black`}>
+                    <Avatar className={`h-9 w-9 text-sm ${avatarColor} text-black ${getAvatarBorderColor(client.status)}`}>
                         <AvatarFallback>{initial}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                         <div className="font-semibold">{client.name} {client.lastName}</div>
-                        <div className="text-xs text-muted-foreground">Sector: {client.sector?.name || 'N/A'}</div>
+                        <div className="text-xs text-muted-foreground">Sector: {installation?.sector?.name || 'N/A'}</div>
                     </div>
                     {/* Imagen de referencia */}
                     <ClientImageFill
-                        imagePath={client.referenceImage}
+                        imagePath={installation?.referenceImage}
                         alt="Imagen de Referencia"
                         className="w-8 h-8 flex-shrink-0"
                         showFallbackIcon={true}
@@ -140,71 +164,62 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mb-4">
             <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Plan</div>
-                <div className="font-medium">{client.plan?.name || 'N/A'}</div>
-                <div className="text-xs text-muted-foreground">S/ {client.plan?.price || '0.00'}/mes</div>
-            </div>
-            <div>
-                <div className="text-xs text-muted-foreground mb-0.5">Servicio</div>
-                <div className="flex items-center gap-1.5 font-medium">
-                    {getServiceIcon(client.plan?.service?.name)}
-                    <span>{client.plan?.service?.name || 'N/A'}</span>
+                <div className="font-medium flex items-center gap-2">
+                    {getServiceIcon(plan?.service?.name)}
+                    {plan?.name || 'N/A'}
                 </div>
-                <div className="text-xs text-muted-foreground">{client.plan?.speed ?? 'N/A'} Mbps</div>
+                <div className="text-xs text-muted-foreground">
+                    {plan?.speed || 'N/A'} Mbps • S/ {plan?.price || '0.00'}/mes
+                </div>
             </div>
             <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Próximo Pago</div>
                 <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">Próximo Pago</p>
                     <p className="text-sm text-muted-foreground">
                         {(() => {
-                            const { date, isFromInitial } = getDisplayPaymentDate(client);
-                            return (
-                                <>
-                                    {date}
-                                    {isFromInitial && (
-                                        <span className="ml-1 text-xs text-muted-foreground">(Basado en fecha inicial)</span>
-                                    )}
-                                </>
-                            );
+                            const installation = getMainInstallation(client);
+                            const paymentConfig = installation?.paymentConfig;
+                            const payments = client.payments || [];
+
+                            if (paymentConfig?.initialPaymentDate) {
+                                return calculateNextPaymentDateForDisplay(paymentConfig.initialPaymentDate, payments.length);
+                            }
+
+                            return "No definida";
                         })()}
                     </p>
                 </div>
             </div>
             <div>
-                <div className="text-xs text-muted-foreground mb-0.5">Estado Cuenta / Pago</div>
+                <div className="text-xs text-muted-foreground mb-0.5">Estado Cuenta  Pago</div>
                 <div className="flex flex-col items-start gap-1">
-                    <Badge variant={getAccountStatusVariant(client.status)}>{getAccountStatusLabel(client.status)}</Badge>
-                    <Badge variant={getPaymentStatusVariant(clientOwnPaymentStatus)}>{getClientPaymentStatusLabel(clientOwnPaymentStatus)}</Badge>
+
+                    <Badge variant={paymentBadgeVariant}>{paymentInfo.text}</Badge>
                 </div>
             </div>
         </div>
     );
 
     const bottomSectionContent = (
-        <div className="grid grid-cols-3 gap-x-4 text-sm">
+        <div className="grid grid-cols-2 gap-x-4 text-sm">
             <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Teléfono</div>
                 <div className="font-medium">{client.phone || 'N/A'}</div>
             </div>
             <div>
-                <div className="text-xs text-muted-foreground mb-0.5">Renta</div>
-                <div className="font-medium">{client.advancePayment ? "Adelantada" : "Pendiente"}</div>
-            </div>
-            <div>
                 <div className="text-xs text-muted-foreground mb-0.5">IP</div>
-                <div className="font-medium">{client.ipAddress || 'N/A'}</div>
+                <div className="font-medium">{installation?.ipAddress || 'N/A'}</div>
             </div>
         </div>
     );
 
     // Renderizar usando el Shell
     return (
-        <CardContent>
-            <InfoCardShell
-                topSection={topSectionContent}
-                middleSection={middleSectionContent}
-                bottomSection={bottomSectionContent}
-            />
-        </CardContent>
+        <InfoCardShell
+            topSection={topSectionContent}
+            middleSection={middleSectionContent}
+            bottomSection={bottomSectionContent}
+            className="flex flex-col min-h-[340px] h-full"
+        />
     );
 } 

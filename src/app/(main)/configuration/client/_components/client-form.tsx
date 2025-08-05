@@ -98,212 +98,124 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
             referenceImage: undefined
         },
         mode: "onChange"
-    })
+    });
+
+    const isEditing = !!client?.id;
 
     useEffect(() => {
-        refreshPlans()
-        refreshSector()
-        refreshService()
         setIsMounted(true)
     }, [])
 
     useEffect(() => {
-        if (client) {
-            const initialAdvancePayment = convertToBoolean(client.advancePayment);
-            console.log('Valor inicial de advancePayment:', initialAdvancePayment, 'Valor original:', client.advancePayment);
-
-            form.reset({
-                id: client.id,
-                name: client.name,
-                lastName: client.lastName,
-                dni: client.dni,
-                phone: client.phone ?? '',
-                address: client.address ?? '',
-                installationDate: client.installationDate ? format(new Date(client.installationDate), 'yyyy-MM-dd') : '',
-                reference: client.reference ?? '',
-                paymentDate: client.paymentDate ? format(new Date(client.paymentDate), 'yyyy-MM-dd') : '',
-                advancePayment: initialAdvancePayment,
-                status: client.status,
-                plan: client.plan?.id || 0,
-                sector: client.sector?.id,
-                description: client.description ?? '',
-                paymentStatus: client.paymentStatus,
-                decoSerial: client.decoSerial ?? '',
-                routerSerial: client.routerSerial ?? '',
-                ipAddress: client.ipAddress ?? '',
-                referenceImage: undefined
-            });
-            setSelectedServiceId(client.plan?.service?.id || null);
-            setIsDniValid(true);
-            form.clearErrors('dni');
-
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL || ''; // Usa tu URL base de API o déjala vacía si las rutas ya son absolutas desde el backend
-            if (client.referenceImage && typeof client.referenceImage === 'string') {
-                // Si referenceImage ya es una URL absoluta, úsala directamente.
-                // Si es una ruta relativa al backend, construye la URL completa.
-                if (client.referenceImage.startsWith('http://') || client.referenceImage.startsWith('https://')) {
-                    setExistingReferenceImageUrl(client.referenceImage);
-                } else if (baseUrl) {
-                    setExistingReferenceImageUrl(`${baseUrl}/${client.referenceImage.replace(/^\//, '')}`);
-                } else {
-                    // Si no hay baseUrl y no es una URL absoluta, podría ser una ruta relativa al directorio public de Next.js
-                    // Asegúrate de que comience con '/' si es el caso.
-                    setExistingReferenceImageUrl(client.referenceImage.startsWith('/') ? client.referenceImage : `/${client.referenceImage}`);
-                }
-            } else {
-                setExistingReferenceImageUrl(null);
-            }
-
-        } else {
-            form.reset({
-                id: undefined,
-                name: '',
-                lastName: '',
-                dni: '',
-                phone: '',
-                address: '',
-                installationDate: '',
-                reference: '',
-                paymentDate: '',
-                advancePayment: false,
-                status: AccountStatusEnum.enum.ACTIVE,
-                plan: 0,
-                sector: undefined,
-                description: '',
-                paymentStatus: undefined,
-                decoSerial: '',
-                routerSerial: '',
-                ipAddress: '',
-                referenceImage: undefined
-            });
-            setIsDniValid(false);
-            setExistingReferenceImageUrl(null);
-            setSelectedServiceId(null);
+        if (client?.referenceImage) {
+            setExistingReferenceImageUrl(`/uploads/clients/${client.referenceImage}`);
         }
-        setStep(1);
-        onSubmitInvocationIdRef.current = 0;
-    }, [ client, form ]);
+    }, [ client?.referenceImage ]);
 
-    const filteredPlans = React.useMemo(() => {
-        if (!selectedServiceId) return [];
-        return plans.filter(plan => plan.service?.id === selectedServiceId);
-    }, [ plans, selectedServiceId ]);
+    useEffect(() => {
+        if (isMounted) {
+            refreshPlans()
+            refreshSector()
+            refreshService()
+        }
+    }, [ isMounted, refreshPlans, refreshSector, refreshService ])
 
+    // Función para validar DNI contra la base de datos
     const checkDniExists = async (dni: string): Promise<boolean> => {
         try {
-            const response = await api.get(`/client/validate-dni/${dni}`);
-            return response.data.exists;
+            const response = await api.get(`/client/validate-dni/${dni}`, {
+                params: { excludeId: client?.id } // Excluir el cliente actual si estamos editando
+            });
+            return !response.data.valid; // Invertimos porque queremos saber si existe
         } catch (error) {
             console.error('Error al verificar DNI:', error);
             return false;
         }
     };
 
-    useEffect(() => {
-        return () => {
-            if (dniValidationTimeoutRef.current) {
-                clearTimeout(dniValidationTimeoutRef.current);
-            }
-        };
-    }, []);
-
-    if (!isMounted) {
-        return null;
+    const nextStep = () => {
+        setStep(step + 1)
     }
 
-    const nextStep = () => {
-        setStep(prev => Math.min(3, prev + 1));
-    };
-
     const prevStep = () => {
-        setStep(prev => Math.max(1, prev - 1));
-    };
+        setStep(step - 1)
+    }
 
     const getFieldsForStep = (currentStep: number): (keyof ClientFormData)[] => {
         switch (currentStep) {
             case 1:
-                return [ "name", "lastName", "dni", "phone", "address", "reference", "description" ];
+                return [ 'name', 'lastName', 'dni', 'phone', 'address', 'description', 'birthdate', 'status' ]
             case 2:
-                return [ "plan", "sector", "installationDate", "paymentDate", "status", "advancePayment", "decoSerial", "routerSerial", "ipAddress" ];
+                return [ 'installationDate', 'plan', 'sector', 'reference', 'ipAddress', 'referenceImage' ]
             case 3:
-                return [ "referenceImage" ];
+                return [ 'paymentDate', 'advancePayment', 'routerSerial', 'decoSerial' ]
             default:
-                return [];
+                return []
         }
-    };
+    }
 
     const validateCurrentStep = async () => {
-        const fieldsToValidate = getFieldsForStep(step);
-        const results = await Promise.all(
-            fieldsToValidate.map(field => form.trigger(field))
-        );
+        const fieldsForStep = getFieldsForStep(step)
+        const isValid = await form.trigger(fieldsForStep as any)
 
-        if (step === 1 && !isDniValid && !client) {
-            toast.error("Por favor, ingrese un DNI válido");
-            return false;
+        // Validación especial para DNI en el paso 1
+        if (step === 1 && form.getValues('dni')) {
+            const dniValue = form.getValues('dni');
+            if (dniValue.length === 8) {
+                setIsDniChecking(true);
+                try {
+                    const exists = await checkDniExists(dniValue);
+                    setIsDniValid(!exists);
+                    if (exists) {
+                        toast.error('Este DNI ya está registrado');
+                        return false;
+                    }
+                } catch (error) {
+                    setIsDniValid(true);
+                } finally {
+                    setIsDniChecking(false);
+                }
+            }
         }
 
-        return results.every(result => result === true);
-    };
+        return isValid && isDniValid;
+    }
 
+    // Función para validar DNI con debounce
     const validateDni = async (dni: string) => {
-        if (!dni || dni.length !== 8) {
-            form.setError('dni', {
-                type: 'manual',
-                message: 'El DNI debe contener exactamente 8 dígitos'
-            });
-            setIsDniValid(false);
-            return;
-        }
-
-        if (!/^\d{8}$/.test(dni)) {
-            form.setError('dni', {
-                type: 'manual',
-                message: 'El DNI solo debe contener números'
-            });
-            setIsDniValid(false);
-            return;
-        }
-
-        if (client && client.dni === dni) {
-            form.clearErrors('dni');
-            setIsDniValid(true);
-            return;
-        }
-
+        // Limpiar timeout anterior
         if (dniValidationTimeoutRef.current) {
             clearTimeout(dniValidationTimeoutRef.current);
         }
 
-        dniValidationTimeoutRef.current = setTimeout(async () => {
-            try {
-                setIsDniChecking(true);
-                const dniResponse = await api.get(`/client/validate-dni/${dni}`);
+        // Si el DNI no tiene 8 dígitos, no validar
+        if (dni.length !== 8) {
+            setIsDniValid(true);
+            setIsDniChecking(false);
+            return;
+        }
 
-                if (dniResponse.data.exists) {
+        // Esperar 500ms antes de validar
+        dniValidationTimeoutRef.current = setTimeout(async () => {
+            setIsDniChecking(true);
+            try {
+                const exists = await checkDniExists(dni);
+                setIsDniValid(!exists);
+                if (exists) {
                     form.setError('dni', {
                         type: 'manual',
-                        message: dniResponse.data.message || 'Este DNI ya está registrado'
+                        message: 'Este DNI ya está registrado'
                     });
-                    setIsDniValid(false);
                 } else {
                     form.clearErrors('dni');
-                    setIsDniValid(true);
                 }
-            } catch (error: any) {
-                console.error("Error al validar DNI:", error);
-                setIsDniValid(false);
-                if (error.response?.status === 400) {
-                    form.setError('dni', {
-                        type: 'manual',
-                        message: error.response.data.message || 'DNI inválido'
-                    });
-                } else {
-                    form.setError('dni', {
-                        type: 'manual',
-                        message: 'Error al validar el DNI'
-                    });
-                }
+            } catch (error) {
+                console.error('Error al validar DNI:', error);
+                setIsDniValid(true);
+                form.setError('dni', {
+                    type: 'manual',
+                    message: 'Error al validar el DNI'
+                });
             } finally {
                 setIsDniChecking(false);
             }
@@ -364,10 +276,7 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                 }
             });
 
-            const isEditing = !!(client?.id || values?.id);
-            const currentId = client?.id || values?.id;
-            console.log(`[${currentInvocationId}] isEditing:`, isEditing, 'client.id:', client?.id, 'values.id:', values?.id);
-            const endpoint = isEditing ? `/client/${currentId}` : '/client';
+            const endpoint = isEditing ? `/client/${client.id}` : '/client';
             const method = isEditing ? 'PATCH' : 'POST';
 
             console.log(`[${currentInvocationId}] API Call: ${method} ${endpoint}`);
@@ -450,483 +359,517 @@ export function ClientForm({ client, onSubmit, isLoading, onCancel }: ClientForm
                 return octet;
             }
 
-            // Validar rango (0-255)
-            if (isNaN(num) || num < 0) return '0';
-            if (num > 255) return '255';
-
+            // Limitar a 255
+            if (num > 255) num = 255;
             return num.toString();
-        }).slice(0, 4); // Máximo 4 octetos
+        });
 
-        // Unir octetos con puntos
+        // Reconstruir la dirección IP
         return octets.join('.');
     };
 
-    // Función para manejar el cambio en el input de IP
     const handleIPChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (...event: any[]) => void) => {
-        let value = e.target.value;
-
-        // Si se presiona backspace y hay un punto al final, eliminar el punto
-        if (value.length < (e.target.defaultValue?.length || 0) && value.endsWith('.')) {
-            value = value.slice(0, -1);
-        }
-
-        // Formatear el valor
-        let formattedValue = formatIPv4(value);
-
-        // Agregar punto automáticamente después de un octeto válido
-        const octets = formattedValue.split('.');
-        const lastOctet = octets[ octets.length - 1 ];
-        if (lastOctet.length === 3 && octets.length < 4 && parseInt(lastOctet) <= 255) {
-            formattedValue += '.';
-        }
-
+        const formattedValue = formatIPv4(e.target.value);
         onChange(formattedValue);
     };
 
+    if (!isMounted) {
+        return null
+    }
+
     return (
-        <Form {...form}>
-            <form
-                onSubmit={async (e) => {
-                    e.preventDefault();
-                    console.log('Form onSubmit triggered. Step:', step, 'isSubmitting:', isSubmitting, 'submitAttemptRef:', submitAttemptRef.current, 'isDniValid:', isDniValid);
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-2xl font-bold tracking-tight">
+                        {isEditing ? 'Editar Cliente' : 'Crear Nuevo Cliente'}
+                    </h2>
+                    <p className="text-muted-foreground">
+                        {isEditing ? 'Actualiza la información del cliente' : 'Complete la información del cliente'}
+                    </p>
+                </div>
+            </div>
 
-                    if (step !== 3) {
-                        console.log('Form onSubmit: step is not 3, returning.');
-                        return;
-                    }
-                    if (isSubmitting || submitAttemptRef.current) {
-                        console.log('Form onSubmit: submission already in progress or attempted (isSubmitting:', isSubmitting, 'submitAttemptRef:', submitAttemptRef.current, '), returning.');
-                        return;
-                    }
-                    if (!isDniValid) {
-                        console.log('Form onSubmit: DNI is not valid, returning.');
-                        toast.error("El DNI no es válido. No se puede guardar.");
-                        return;
-                    }
-
-                    console.log('Form onSubmit: proceeding to call _onSubmit.');
-                    setIsSubmitting(true);
-                    submitAttemptRef.current = true;
-
-                    try {
-                        await _onSubmit(form.getValues());
-                    } catch (error) {
-                        console.error("Error calling _onSubmit from form handler:", error);
-                        toast.error("Ocurrió un error inesperado al intentar guardar.");
-                        setIsSubmitting(false);
-                        submitAttemptRef.current = false;
-                    }
-                }}
-                className="flex flex-col h-[calc(80vh-8rem)]"
-                aria-label={client?.id ? "Formulario de edición de cliente" : "Formulario de nuevo cliente"}
-            >
-                <div className="flex-1 overflow-y-auto scrollbar-hide">
+            <Form {...form}>
+                <form onSubmit={form.handleSubmit(_onSubmit)} className="space-y-8">
+                    {/* Step 1: Información del Cliente */}
                     {step === 1 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
-                            <h3 className="text-lg font-medium mb-4 md:col-span-2">Paso 1: Datos Personales</h3>
-                            <FormField
-                                control={form.control}
-                                name="name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Nombre</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                placeholder="Nombre"
-                                                onChange={(e) => {
-                                                    field.onChange(e);
-                                                    form.trigger("name");
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="lastName"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Apellido</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                placeholder="Apellido"
-                                                onChange={(e) => {
-                                                    field.onChange(e);
-                                                    form.trigger("lastName");
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="dni"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>DNI</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                placeholder="DNI (8 dígitos)"
-                                                maxLength={8}
-                                                onChange={(e) => {
-                                                    const value = e.target.value.replace(/\D/g, '');
-                                                    field.onChange(value);
-                                                    form.trigger("dni");
-                                                }}
-                                                onBlur={() => validateDni(field.value)}
-                                                disabled={isDniChecking}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                        {isDniChecking && (
-                                            <p className="text-sm text-muted-foreground">
-                                                Verificando DNI...
-                                            </p>
-                                        )}
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="phone"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Teléfono</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                placeholder="Teléfono (mínimo 9 dígitos)"
-                                                onChange={(e) => {
-                                                    const value = e.target.value.replace(/\D/g, '');
-                                                    field.onChange(value);
-                                                    form.trigger("phone");
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField control={form.control} name="address" render={({ field }) => (
-                                <FormItem><FormLabel>Dirección</FormLabel><FormControl><Input {...field} placeholder="Dirección (Opcional)" /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={form.control} name="reference" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Referencia</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            {...field}
-                                            placeholder="Referencia (Opcional)"
-                                            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="description" render={({ field }) => (
-                                <FormItem className="md:col-span-2"><FormLabel>Descripción</FormLabel><FormControl><Textarea {...field} placeholder="Descripción adicional (Opcional)" className="resize-none" /></FormControl><FormMessage /></FormItem>
-                            )} />
-                        </div>
-                    )}
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <h3 className="text-lg font-semibold">Información del Cliente</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Complete los datos básicos del cliente
+                                </p>
+                            </div>
 
-                    {step === 2 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
-                            <h3 className="text-lg font-medium mb-4 md:col-span-2">Paso 2: Detalles del Servicio</h3>
-                            <FormItem className="md:col-span-2">
-                                <FormLabel>Tipo de Servicio</FormLabel>
-                                <Select
-                                    onValueChange={handleServiceChange}
-                                    value={selectedServiceId?.toString() ?? ''}
-                                    disabled={isLoading}
-                                >
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar servicio" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {services.map((service) => (
-                                            <SelectItem key={service.id} value={service.id.toString()}>
-                                                {service.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                            <FormField control={form.control} name="plan" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Plan</FormLabel>
-                                    <Select
-                                        onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
-                                        value={field.value?.toString() ?? ''}
-                                        disabled={!selectedServiceId}
-                                    >
-                                        <FormControl><SelectTrigger><SelectValue placeholder={!selectedServiceId ? "Seleccione servicio primero" : "Seleccione un plan"} /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            {filteredPlans.map((plan) => (
-                                                <SelectItem key={plan.id} value={plan.id.toString()}>
-                                                    {plan.name} - {plan.speed} Mbps (S/ {plan.price})
-                                                </SelectItem>
-                                            ))}
-                                            {selectedServiceId && filteredPlans.length === 0 && (
-                                                <p className="p-4 text-sm text-muted-foreground">No hay planes para este servicio.</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="name"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Nombres *</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Ingrese los nombres" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="lastName"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Apellidos *</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Ingrese los apellidos" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="dni"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>DNI *</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    placeholder="12345678"
+                                                    {...field}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                                        field.onChange(value);
+                                                        validateDni(value);
+                                                    }}
+                                                    className={cn(
+                                                        isDniChecking && "animate-pulse",
+                                                        !isDniValid && "border-red-500"
+                                                    )}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                            {isDniChecking && (
+                                                <p className="text-sm text-muted-foreground">Verificando DNI...</p>
                                             )}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="sector" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Sector</FormLabel>
-                                    <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} defaultValue={field.value?.toString() ?? ''}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un sector" /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            {sectors.map((sector) => <SelectItem key={sector.id} value={sector.id.toString()}>{sector.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField
-                                control={form.control}
-                                name="installationDate"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-col">
-                                        <FormLabel>Fecha Instalación</FormLabel>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <FormControl>
-                                                    <Button
-                                                        variant={"outline"}
-                                                        className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                                    >
-                                                        {field.value ? format(new Date(`${field.value}T00:00:00`), "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                    </Button>
-                                                </FormControl>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={field.value ? new Date(`${field.value}T00:00:00`) : undefined}
-                                                    onSelect={handleDateChange.bind(null, "installationDate")}
-                                                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                                    initialFocus
-                                                    locale={es}
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="paymentDate"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-col">
-                                        <FormLabel>Fecha Próximo Pago</FormLabel>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <FormControl>
-                                                    <Button
-                                                        variant={"outline"}
-                                                        className={cn(
-                                                            "pl-3 text-left font-normal",
-                                                            !field.value && "text-muted-foreground"
-                                                        )}
-                                                    >
-                                                        {field.value ? (
-                                                            format(
-                                                                new Date(`${field.value}T12:00:00Z`),
-                                                                "PPP",
-                                                                { locale: es }
-                                                            )
-                                                        ) : (
-                                                            <span>Seleccionar fecha</span>
-                                                        )}
-                                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                    </Button>
-                                                </FormControl>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={field.value ? new Date(`${field.value}T12:00:00Z`) : undefined}
-                                                    onSelect={handleDateChange.bind(null, "paymentDate")}
-                                                    disabled={(date) => date < new Date("1900-01-01")}
-                                                    initialFocus
-                                                    locale={es}
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                        <FormDescription>
-                                            {!client || !client.initialPaymentDate
-                                                ? "Esta fecha se establecerá como la fecha inicial de pago"
-                                                : "Basada en la fecha inicial de pago"}
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField control={form.control} name="status" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Estado Cuenta</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Seleccione estado" /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            {AccountStatusEnum.options.map((status) => (
-                                                <SelectItem key={status} value={status}>{getAccountStatusLabel(status)}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="advancePayment" render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                                    <FormControl>
-                                        <Checkbox
-                                            checked={convertToBoolean(field.value)}
-                                            onCheckedChange={(checked) => {
-                                                const boolValue = convertToBoolean(checked);
-                                                field.onChange(boolValue);
-                                                console.log('Checkbox onChange:', boolValue, 'Valor original:', checked);
-                                            }}
-                                            id="advancePaymentCheckbox"
-                                        />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel htmlFor="advancePaymentCheckbox">
-                                            Pago Adelantado
-                                        </FormLabel>
-                                    </div>
-                                    <FormMessage className="ml-auto" />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="decoSerial" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Serie Decodificador</FormLabel>
-                                    <FormControl><Input {...field} placeholder="Serie del Deco (Opcional)" /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="routerSerial" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Serie Router</FormLabel>
-                                    <FormControl><Input {...field} placeholder="Serie del Router (Opcional)" /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField
-                                control={form.control}
-                                name="ipAddress"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Dirección IP</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                placeholder="Ej: 192.168.1.1"
-                                                onChange={(e) => handleIPChange(e, field.onChange)}
-                                                maxLength={15} // Longitud máxima de una IPv4
-                                            />
-                                        </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
 
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                <FormField
+                                    control={form.control}
+                                    name="phone"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Teléfono *</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    placeholder="999 999 999"
+                                                    {...field}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value.replace(/\D/g, '').slice(0, 9);
+                                                        const formatted = value.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
+                                                        field.onChange(formatted);
+                                                    }}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="address"
+                                    render={({ field }) => (
+                                        <FormItem className="md:col-span-2">
+                                            <FormLabel>Dirección *</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Ingrese la dirección completa" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="description"
+                                    render={({ field }) => (
+                                        <FormItem className="md:col-span-2">
+                                            <FormLabel>Descripción</FormLabel>
+                                            <FormControl>
+                                                <Textarea
+                                                    placeholder="Información adicional del cliente"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="status"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Estado</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Seleccione un estado" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {Object.entries(AccountStatusEnum.enum).map(([ key, value ]) => (
+                                                        <SelectItem key={value} value={value}>
+                                                            {getAccountStatusLabel(value)}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            <div className="flex justify-end">
+                                <Button
+                                    type="button"
+                                    onClick={async () => {
+                                        const isValid = await validateCurrentStep();
+                                        if (isValid) {
+                                            nextStep();
+                                        }
+                                    }}
+                                    disabled={isDniChecking}
+                                >
+                                    Siguiente
+                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     )}
 
-                    {step === 3 && (
-                        <div className="grid grid-cols-1 gap-6 p-2">
-                            <h3 className="text-lg font-medium mb-4">Paso 3: Imagen de Referencia</h3>
-                            <FormField
-                                control={form.control}
-                                name="referenceImage"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Imagen de Referencia</FormLabel>
-                                        <FormControl>
-                                            <FileUpload
-                                                value={field.value}
-                                                onChange={(file) => {
-                                                    field.onChange(file);
-                                                    form.trigger("referenceImage");
-                                                }}
-                                                maxSize={2 * 1024 * 1024}
-                                                existingImageUrl={existingReferenceImageUrl}
-                                            />
-                                        </FormControl>
-                                        <FormDescription>
-                                            Sube una imagen de referencia del lugar de instalación (opcional)
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                    )}
-                </div>
+                    {/* Step 2: Información de Instalación */}
+                    {step === 2 && (
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <h3 className="text-lg font-semibold">Información de Instalación</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Complete los datos de la instalación
+                                </p>
+                            </div>
 
-                <div className="flex justify-between p-4 border-t bg-white">
-                    <div>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={step === 1 ? onCancel : prevStep}
-                            disabled={isSubmitting}
-                        >
-                            {step === 1 ? "Cancelar" : (
-                                <>
-                                    <ArrowLeft className="w-4 h-4 mr-2" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="installationDate"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Fecha de Instalación</FormLabel>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <FormControl>
+                                                        <Button
+                                                            variant={"outline"}
+                                                            className={cn(
+                                                                "w-full pl-3 text-left font-normal",
+                                                                !field.value && "text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {field.value ? (
+                                                                format(new Date(field.value), "PPP", { locale: es })
+                                                            ) : (
+                                                                <span>Seleccione una fecha</span>
+                                                            )}
+                                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                        </Button>
+                                                    </FormControl>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0" align="start">
+                                                    <Calendar
+                                                        mode="single"
+                                                        selected={field.value ? new Date(field.value) : undefined}
+                                                        onSelect={(date) => handleDateChange("installationDate", date)}
+                                                        disabled={(date) =>
+                                                            date > new Date() || date < new Date("1900-01-01")
+                                                        }
+                                                        initialFocus
+                                                    />
+                                                </PopoverContent>
+                                            </Popover>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="plan"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Plan *</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Seleccione un plan" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {plans.map((plan) => (
+                                                        <SelectItem key={plan.id} value={plan.id.toString()}>
+                                                            {plan.name} - ${plan.price}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="sector"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Sector *</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Seleccione un sector" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {sectors.map((sector) => (
+                                                        <SelectItem key={sector.id} value={sector.id.toString()}>
+                                                            {sector.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="reference"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Referencia</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Referencia de ubicación" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="ipAddress"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Dirección IP</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    placeholder="192.168.1.1"
+                                                    {...field}
+                                                    onChange={(e) => handleIPChange(e, field.onChange)}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="referenceImage"
+                                    render={({ field }) => (
+                                        <FormItem className="md:col-span-2">
+                                            <FormLabel>Imagen de Referencia</FormLabel>
+                                            <FormControl>
+                                                <FileUpload
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    maxSize={2 * 1024 * 1024} // 2MB
+                                                    accept="image/*"
+                                                    existingImageUrl={existingReferenceImageUrl}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            <div className="flex justify-between">
+                                <Button type="button" variant="outline" onClick={prevStep}>
+                                    <ArrowLeft className="mr-2 h-4 w-4" />
                                     Anterior
-                                </>
-                            )}
-                        </Button>
-                    </div>
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={async () => {
+                                        const isValid = await validateCurrentStep();
+                                        if (isValid) {
+                                            nextStep();
+                                        }
+                                    }}
+                                >
+                                    Siguiente
+                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
 
-                    <div>
-                        {step === 3 ? (
-                            <Button
-                                type="submit"
-                                disabled={isSubmitting || submitAttemptRef.current || !isDniValid}
-                            >
-                                {isSubmitting ? "Guardando..." : (client?.id || form.getValues("id") ? "Actualizar Cliente" : "Guardar Cliente")}
-                            </Button>
-                        ) : (
-                            <Button
-                                type="button"
-                                onClick={async (e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
+                    {/* Step 3: Información de Pagos y Dispositivos */}
+                    {step === 3 && (
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <h3 className="text-lg font-semibold">Información de Pagos y Dispositivos</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Complete los datos de pagos y dispositivos
+                                </p>
+                            </div>
 
-                                    const isValid = await validateCurrentStep();
-                                    if (!isValid) {
-                                        toast.error("Por favor, complete todos los campos requeridos del paso actual");
-                                        return;
-                                    }
-                                    nextStep();
-                                }}
-                                disabled={isSubmitting}
-                            >
-                                Siguiente <ArrowRight className="w-4 h-4 ml-2" />
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </form>
-        </Form>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="paymentDate"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Fecha de Pago</FormLabel>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <FormControl>
+                                                        <Button
+                                                            variant={"outline"}
+                                                            className={cn(
+                                                                "w-full pl-3 text-left font-normal",
+                                                                !field.value && "text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {field.value ? (
+                                                                format(new Date(field.value), "PPP", { locale: es })
+                                                            ) : (
+                                                                <span>Seleccione una fecha</span>
+                                                            )}
+                                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                        </Button>
+                                                    </FormControl>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0" align="start">
+                                                    <Calendar
+                                                        mode="single"
+                                                        selected={field.value ? new Date(field.value) : undefined}
+                                                        onSelect={(date) => handleDateChange("paymentDate", date)}
+                                                        disabled={(date) =>
+                                                            date < new Date("1900-01-01")
+                                                        }
+                                                        initialFocus
+                                                    />
+                                                </PopoverContent>
+                                            </Popover>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="advancePayment"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                            <FormControl>
+                                                <Checkbox
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                />
+                                            </FormControl>
+                                            <div className="space-y-1 leading-none">
+                                                <FormLabel>
+                                                    Pago Adelantado
+                                                </FormLabel>
+                                                <FormDescription>
+                                                    Marque si el cliente tiene pago adelantado
+                                                </FormDescription>
+                                            </div>
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="routerSerial"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Serial del Router</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Serial del router" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="decoSerial"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Serial del Deco</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Serial del deco" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            <div className="flex justify-between">
+                                <Button type="button" variant="outline" onClick={prevStep}>
+                                    <ArrowLeft className="mr-2 h-4 w-4" />
+                                    Anterior
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={isSubmitting || isLoading}
+                                    onClick={async () => {
+                                        const isValid = await validateCurrentStep();
+                                        if (!isValid) {
+                                            return;
+                                        }
+                                    }}
+                                >
+                                    {isSubmitting ? (
+                                        <>
+                                            <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-white" />
+                                            {isEditing ? 'Actualizando...' : 'Creando...'}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {isEditing ? 'Actualizar Cliente' : 'Crear Cliente'}
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </form>
+            </Form>
+        </div>
     )
 }

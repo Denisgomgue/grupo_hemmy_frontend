@@ -1,14 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
-import api from "@/lib/axios"
-import { Client } from "@/types/clients/client"
-
-interface ClientSummary {
-    totalClientes: number;
-    clientesActivos: number;
-    clientesVencidos: number;
-    clientesPorVencer: number;
-    period: string;
-}
+import { ClientsAPI } from "@/services"
+import { Client, AccountStatus } from "@/types/clients/client"
 
 export function useClient() {
     const [ clients, setClients ] = useState<Client[]>([]);
@@ -17,20 +9,27 @@ export function useClient() {
         page: number = 1,
         pageSize: number = 10,
         search?: string,
-        filters?: any,
-        selectedSectors?: string[]
+        filters?: {
+            status?: Record<AccountStatus, boolean>;
+            name?: string;
+            dni?: string;
+            services?: string[];
+            sectors?: string[];
+            minCost?: number;
+            maxCost?: number;
+        }
     ) => {
         try {
             const params: Record<string, any> = {
-                page: page.toString(),
-                limit: pageSize.toString()
+                page,
+                limit: pageSize
             };
 
             if (search) {
                 params.search = search;
             }
 
-            // Procesar filtros avanzados
+            // Procesar filtros de estado
             if (filters?.status) {
                 const activeStatuses = Object.entries(filters.status)
                     .filter(([ _, value ]) => value)
@@ -40,30 +39,34 @@ export function useClient() {
                 }
             }
 
-            if (filters?.services) {
-                const activeServices = Object.entries(filters.services)
-                    .filter(([ _, value ]) => value)
-                    .map(([ key ]) => key);
-                if (activeServices.length > 0) {
-                    params.services = activeServices;
-                }
+            if (filters?.name) {
+                params.name = filters.name;
             }
 
-            if (filters?.planCost) {
-                params.minCost = filters.planCost.min.toString();
-                params.maxCost = filters.planCost.max.toString();
+            if (filters?.dni) {
+                params.dni = filters.dni;
             }
 
-            if (selectedSectors && selectedSectors.length > 0) {
-                params.sectors = selectedSectors;
+            // Procesar filtros avanzados
+            if (filters?.services && filters.services.length > 0) {
+                params.services = filters.services;
             }
 
-            const response = await api.get<{ data: Client[], total: number }>("/client", {
-                params
-            });
+            if (filters?.sectors && filters.sectors.length > 0) {
+                params.sectors = filters.sectors;
+            }
 
-            setClients(response.data.data);
-            return response.data;
+            if (filters?.minCost !== undefined) {
+                params.minCost = filters.minCost;
+            }
+
+            if (filters?.maxCost !== undefined) {
+                params.maxCost = filters.maxCost;
+            }
+
+            const response = await ClientsAPI.getAll(params);
+            setClients(response.data);
+            return response;
         } catch (error) {
             console.error("Error fetching clients:", error);
             return { data: [], total: 0 };
@@ -72,31 +75,113 @@ export function useClient() {
 
     const getClientById = useCallback(async (id: string | number): Promise<Client> => {
         try {
-            const response = await api.get<Client>(`/client/${id}`);
-            return response.data;
+            const response = await ClientsAPI.getById(id);
+            return response;
         } catch (error) {
             console.error(`Error fetching client with ID ${id}:`, error);
             throw error;
         }
     }, []);
 
-    const getClientSummary = useCallback(async (period?: string) => {
+    const createClient = useCallback(async (clientData: any): Promise<Client> => {
         try {
-            const response = await api.get<ClientSummary>("/client/summary", {
-                params: period ? { period } : {}
-            });
-            return response.data;
+            const response = await ClientsAPI.create(clientData);
+            await refreshClient();
+            return response;
+        } catch (error) {
+            console.error("Error creating client:", error);
+            throw error;
+        }
+    }, [ refreshClient ]);
+
+    const updateClient = useCallback(async (id: number, clientData: any): Promise<Client> => {
+        try {
+            const response = await ClientsAPI.update(id, clientData);
+            await refreshClient();
+            return response;
+        } catch (error) {
+            console.error("Error updating client:", error);
+            throw error;
+        }
+    }, [ refreshClient ]);
+
+    const deleteClient = useCallback(async (id: number): Promise<void> => {
+        try {
+            await ClientsAPI.delete(id);
+            await refreshClient();
+        } catch (error) {
+            console.error("Error deleting client:", error);
+            throw error;
+        }
+    }, [ refreshClient ]);
+
+    const getClientSummary = useCallback(async () => {
+        try {
+            const response = await ClientsAPI.getSummary();
+            return response;
         } catch (error) {
             console.error("Error fetching client summary:", error);
             return {
                 totalClientes: 0,
                 clientesActivos: 0,
-                clientesVencidos: 0,
-                clientesPorVencer: 0,
-                period: period || "all"
+                clientesSuspendidos: 0,
+                clientesInactivos: 0,
+                period: 0 // Siempre 0 ya que no usamos period en el frontend
             };
         }
     }, []);
 
-    return { clients, refreshClient, getClientById, getClientSummary };
+    const validateDni = useCallback(async (dni: string) => {
+        try {
+            const response = await ClientsAPI.validateDni(dni);
+            return response;
+        } catch (error) {
+            console.error("Error validating DNI:", error);
+            throw error;
+        }
+    }, []);
+
+    const syncStates = useCallback(async () => {
+        try {
+            const response = await ClientsAPI.syncStates();
+            return response;
+        } catch (error) {
+            console.error("Error syncing client states:", error);
+            throw error;
+        }
+    }, []);
+
+    const getNewClients = useCallback(async () => {
+        try {
+            const response = await ClientsAPI.getNewClients();
+            return response;
+        } catch (error) {
+            console.error("Error fetching new clients:", error);
+            throw error;
+        }
+    }, []);
+
+    const getWithFilters = useCallback(async (filters: any, page: number = 1, limit: number = 10) => {
+        try {
+            const response = await ClientsAPI.getWithFilters(filters, page, limit);
+            return response;
+        } catch (error) {
+            console.error("Error fetching clients with filters:", error);
+            throw error;
+        }
+    }, []);
+
+    return {
+        clients,
+        refreshClient,
+        getClientById,
+        createClient,
+        updateClient,
+        deleteClient,
+        getClientSummary,
+        validateDni,
+        syncStates,
+        getNewClients,
+        getWithFilters
+    };
 }

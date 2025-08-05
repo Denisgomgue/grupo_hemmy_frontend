@@ -11,7 +11,7 @@ interface PaymentFilterTabsProps {
 export function PaymentFilterTabs({ currentFilter, onFilterChange, isLoading = false }: PaymentFilterTabsProps) {
   return (
     <Tabs value={currentFilter} onValueChange={onFilterChange} className="mb-6">
-      <TabsList className="grid w-full max-w-md grid-cols-4">
+      <TabsList className="grid w-full max-w-lg grid-cols-5">
         <TabsTrigger value="ALL" data-state={isLoading ? "disabled" : undefined}>
           Todos
         </TabsTrigger>
@@ -23,6 +23,9 @@ export function PaymentFilterTabs({ currentFilter, onFilterChange, isLoading = f
         </TabsTrigger>
         <TabsTrigger value="LATE_PAYMENT" data-state={isLoading ? "disabled" : undefined}>
           Atrasados
+        </TabsTrigger>
+        <TabsTrigger value="VOIDED" data-state={isLoading ? "disabled" : undefined}>
+          Anulados
         </TabsTrigger>
       </TabsList>
     </Tabs>

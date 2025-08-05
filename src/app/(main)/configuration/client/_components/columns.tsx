@@ -1,22 +1,24 @@
 "use client"
 
 import type { ColumnDef } from "@tanstack/react-table"
-import { Client, AccountStatus, PaymentStatus } from "@/types/clients/client"
+import { Client, AccountStatus } from "@/types/clients/client"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox" // Para la columna de selección
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar" // Para la columna cliente
-import { Check, X, Wifi, Zap, Settings, HelpCircle } from "lucide-react" // Iconos
-import { format } from "date-fns";
+import { Checkbox } from "@/components/ui/checkbox"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { format, startOfDay } from "date-fns";
 import { es } from 'date-fns/locale';
+import { formatDateForDisplay, createDateFromString, calculateNextPaymentDateForDisplay } from "@/lib/utils"
 import Link from "next/link"
 import { getAccountStatusLabel } from "@/utils/account-status-labels"
 import { getClientPaymentStatusLabel } from "@/utils/client-payment-status-labels"
+import { ClientImageFill } from "@/components/ui/client-image"
+import { Wifi, Zap } from "lucide-react"
 
-// Helper para variant del Badge de estado de CUENTA (Activo, Suspendido, etc.)
-const getAccountStatusVariant = (status: AccountStatus): "accountSuccess" | "secondary" | "destructive" | "outline" => {
+// Helper para variant del Badge de estado de CUENTA
+const getAccountStatusVariant = (status: AccountStatus): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
         case AccountStatus.ACTIVE:
-            return "accountSuccess";
+            return "default";
         case AccountStatus.SUSPENDED:
             return "secondary";
         case AccountStatus.INACTIVE:
@@ -26,50 +28,78 @@ const getAccountStatusVariant = (status: AccountStatus): "accountSuccess" | "sec
     }
 }
 
-// Helper para variant del Badge de estado de PAGO (Al día, Por vencer, En mora)
-const getPaymentStatusVariant = (status: PaymentStatus): "success" | "secondary" | "destructive" | "outline" => {
+// Helper para obtener el color del contorno del avatar según el estado del cliente
+const getAvatarBorderColor = (status: AccountStatus): string => {
     switch (status) {
-        case PaymentStatus.PAID:
-            return "success";
-        case PaymentStatus.EXPIRING:
-            return "secondary";
-        case PaymentStatus.SUSPENDED:
-            return "destructive";
-        case PaymentStatus.EXPIRED:
-            return "destructive";
+        case AccountStatus.ACTIVE:
+            return "ring-2 ring-purple-600 ring-offset-2";
+        case AccountStatus.SUSPENDED:
+            return "ring-2 ring-red-500 ring-offset-2";
+        case AccountStatus.INACTIVE:
+            return "ring-2 ring-black ring-offset-2";
         default:
-            return "outline";
+            return "ring-2 ring-gray-400 ring-offset-2";
     }
 }
 
-// Lógica placeholder para determinar estado de PAGO (Al día, Por vencer, En mora)
-const getPaymentStatus = (paymentDateStr: string | null | undefined): { text: string; variant: "success" | "warning" | "destructive" | "outline" } => {
-    if (!paymentDateStr) return { text: "N/D", variant: "outline" };
-    const paymentDate = new Date(paymentDateStr);
-    const today = new Date();
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(today.getDate() + 7);
+// Helper para obtener la instalación principal del cliente
+const getMainInstallation = (client: Client) => {
+    return client.installations?.[ 0 ] || null;
+}
 
-    paymentDate.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    sevenDaysFromNow.setHours(0, 0, 0, 0);
+// Helper para obtener la fecha del próximo pago usando la misma lógica del card
+const getNextPaymentDate = (client: Client): { date: string, isFromInitial: boolean } => {
+    const installation = getMainInstallation(client);
+    const paymentConfig = installation?.paymentConfig;
+    const payments = client.payments || [];
 
-    if (paymentDate < today) {
-        return { text: "En mora", variant: "destructive" };
-    } else if (paymentDate >= today && paymentDate <= sevenDaysFromNow) {
-        return { text: "Por vencer", variant: "warning" }; // Usar warning, se ajustará Badge si es necesario
-    } else {
-        return { text: "Al día", variant: "success" };
+    if (paymentConfig?.initialPaymentDate) {
+        const calculatedDate = calculateNextPaymentDateForDisplay(paymentConfig.initialPaymentDate, payments.length);
+        return {
+            date: calculatedDate,
+            isFromInitial: payments.length === 0
+        };
     }
+
+    return { date: "No definida", isFromInitial: false };
 };
 
-// Helper para iconos de servicio
+// Helper para obtener el icono del servicio
 const getServiceIcon = (serviceName: string | undefined) => {
-    if (!serviceName) return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
-    if (serviceName.toLowerCase().includes("fibra")) return <Zap className="h-4 w-4 text-blue-500" />;
-    if (serviceName.toLowerCase().includes("inalámbrico")) return <Wifi className="h-4 w-4 text-sky-500" />;
-    return <Settings className="h-4 w-4 text-muted-foreground" />;
-}
+    if (!serviceName || serviceName.trim() === '') return null;
+    const serviceLower = serviceName.toLowerCase().trim();
+    if (serviceLower.includes("fibra") || serviceLower.includes("fiber") || serviceLower.includes("óptica")) {
+        return <Zap className="h-4 w-4 text-violet-500" />;
+    }
+    if (serviceLower.includes("inalambrico") || serviceLower.includes("wifi") || serviceLower.includes("wireless")) {
+        return <Wifi className="h-4 w-4 text-purple-500" />;
+    }
+    return null;
+};
+
+// Helper para obtener el estado de pago usando la misma lógica del card
+const getPaymentStatus = (client: Client) => {
+    const installation = getMainInstallation(client);
+    const paymentConfig = installation?.paymentConfig;
+
+    if (!paymentConfig?.paymentStatus) {
+        return { text: "N/D", variant: "outline" as const };
+    }
+
+    // Usar el paymentStatus del backend que ya está calculado correctamente
+    switch (paymentConfig.paymentStatus) {
+        case 'PAID':
+            return { text: "Al día", variant: "default" as const };
+        case 'EXPIRING':
+            return { text: "Por vencer", variant: "secondary" as const };
+        case 'EXPIRED':
+            return { text: "Vencido", variant: "destructive" as const };
+        case 'SUSPENDED':
+            return { text: "Suspendido", variant: "destructive" as const };
+        default:
+            return { text: "N/D", variant: "outline" as const };
+    }
+};
 
 // Definir columnas base
 export const baseColumns: ColumnDef<Client>[] = [
@@ -98,58 +128,60 @@ export const baseColumns: ColumnDef<Client>[] = [
     },
     // Columna Cliente
     {
-        accessorKey: "name", // O usar 'id' si el nombre no es único
+        accessorKey: "name",
         header: "CLIENTE",
         cell: ({ row }) => {
             const client = row.original;
-            const initial = client.name ? client.name[ 0 ].toUpperCase() + client.lastName[ 0 ].toUpperCase() : "?";
+            const installation = getMainInstallation(client);
+            const initial = (client.name && client.lastName)
+                ? client.name[ 0 ].toUpperCase() + client.lastName[ 0 ].toUpperCase()
+                : client.name
+                    ? client.name[ 0 ].toUpperCase()
+                    : "?";
 
             return (
                 <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8 text-xs">
-                        {/* <AvatarImage src={client.avatarUrl} alt={client.name} /> // Si tuvieras URL de avatar */}
+                    <Avatar className={`h-8 w-8 text-xs ${getAvatarBorderColor(client.status)}`}>
                         <AvatarFallback>{initial}</AvatarFallback>
+
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                         <Link
                             href={`/configuration/client/${client.id}`}
                             className="font-medium hover:text-primary hover:underline"
                         >
                             {client.name} {client.lastName}
                         </Link>
-                        <div className="text-xs text-muted-foreground">Sector: {client.sector?.name || 'N/A'}</div>
+
+                        <div className="text-xs text-muted-foreground">
+                            Sector: {installation?.sector?.name || 'N/A'}
+                        </div>
                     </div>
+
                 </div>
             )
         }
     },
-    // Columna Plan
+    // Columna Plan y Servicio
     {
         accessorKey: "plan",
-        header: "PLAN",
+        header: "PLAN Y SERVICIO",
         cell: ({ row }) => {
-            const plan = row.original.plan;
-            return (
-                <div>
-                    <div>{plan?.name || 'N/A'}</div>
-                    <div className="text-xs text-muted-foreground">S/ {plan?.price || 'N/A'}/mes</div>
-                </div>
-            )
-        }
-    },
-    // Columna Servicio
-    {
-        accessorKey: "plan.service", // El servicio viene del plan
-        header: "SERVICIO",
-        cell: ({ row }) => {
-            const service = row.original.plan?.service; // Servicio asociado al plan
-            const speed = row.original.plan?.speed; // Velocidad del plan
+            const client = row.original;
+            const installation = getMainInstallation(client);
+            const plan = installation?.plan;
+            const serviceIcon = getServiceIcon(plan?.service?.name);
+
             return (
                 <div className="flex items-center gap-2">
-                    {getServiceIcon(service?.name)}
+                    {serviceIcon}
                     <div>
-                        <div>{service?.name || 'N/A'}</div>
-                        <div className="text-xs text-muted-foreground">{speed ?? 'N/A'} Mbps</div>
+                        <div className="font-medium flex items-center gap-2">
+                            {plan?.name || 'N/A'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            {plan?.speed || 'N/A'} Mbps - S/ {plan?.price || '0.00'}
+                        </div>
                     </div>
                 </div>
             )
@@ -160,47 +192,38 @@ export const baseColumns: ColumnDef<Client>[] = [
         accessorKey: "paymentDate",
         header: "PRÓXIMO PAGO",
         cell: ({ row }) => {
-            const paymentDate = row.original.paymentDate;
-            const paymentText = row.original.advancePayment ? "Adelantado" : "Pendiente";
+            const client = row.original;
+            const { date, isFromInitial } = getNextPaymentDate(client);
+
             return (
-                <div>
-                    <div>{paymentDate ? format(new Date(paymentDate), 'P', { locale: es }) : 'N/A'}</div>
-                    <div className="text-xs text-muted-foreground">{paymentText}</div>
+                <div className="text-sm">
+                    <div>{date}</div>
+                    {isFromInitial && (
+                        <div className="text-xs text-muted-foreground">(Fecha inicial)</div>
+                    )}
                 </div>
             )
         }
     },
-    // Columna Estado (Cuenta y Pago)
+    // Columna Estados
     {
         accessorKey: "status",
-        header: "ESTADO",
+        header: "ESTADO PAGOS",
         cell: ({ row }) => {
-            const accountStatus = row.original.status;
-            const paymentStatus = row.original.paymentStatus;
+            const client = row.original;
+            const paymentStatus = getPaymentStatus(client);
+
             return (
-                <div className="flex flex-col items-start gap-1 w-full">
-                    <Badge variant={getAccountStatusVariant(accountStatus)}>
-                        {getAccountStatusLabel(accountStatus)}
-                    </Badge>
-                    <Badge variant={getPaymentStatusVariant(paymentStatus)}>
-                        {getClientPaymentStatusLabel(paymentStatus)}
+                <div className="flex flex-col gap-1">
+                    <Badge variant={paymentStatus.variant}>
+                        {paymentStatus.text}
                     </Badge>
                 </div>
             )
         }
-    },
-    // // Columna Dirección IP
-    // {
-    //     accessorKey: "ipAddress",
-    //     header: "DIRECCIÓN IP",
-    //     cell: ({ row }) => {
-    //         const ipAddress = row.original.ipAddress;
-    //         return (
-    //             <div className="font-mono text-sm">
-    //                 {ipAddress || 'N/A'}
-    //             </div>
-    //         )
-    //     }
-    // },
-]
+    }
+
+
+];
+
 

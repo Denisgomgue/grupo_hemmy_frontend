@@ -5,6 +5,7 @@ import { Nunito } from 'next/font/google'
 import { Toaster } from "sonner"
 import { ThemeProvider as Theme } from "@/contexts/ThemeContext"
 import { AuthProvider } from "@/contexts/AuthContext"
+import { FloatingNotificationsProvider } from "@/components/ui/floating-notifications"
 
 const nunito = Nunito({ subsets: [ "latin" ] })
 
@@ -21,15 +22,17 @@ export default function RootLayout({
       <body className={nunito.className}>
         <Theme>
           <AuthProvider>
-            <Toaster richColors position="top-right" />
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="light"
-              enableSystem
-              disableTransitionOnChange
-            >
-              {children}
-            </ThemeProvider>
+            <FloatingNotificationsProvider>
+              <Toaster richColors position="top-right" />
+              <ThemeProvider
+                attribute="class"
+                defaultTheme="light"
+                enableSystem
+                disableTransitionOnChange
+              >
+                {children}
+              </ThemeProvider>
+            </FloatingNotificationsProvider>
           </AuthProvider>
         </Theme>
       </body>

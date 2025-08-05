@@ -1,12 +1,14 @@
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Eye, EyeOff, DollarSign, CheckCircle, Clock, AlertTriangle } from "lucide-react"
+import { Eye, EyeOff, DollarSign, CheckCircle, Clock, AlertTriangle, XCircle } from "lucide-react"
 
 export interface PaymentSummary {
   totalCollected: number;
   paidCount: number;
   pendingCount: number;
   lateCount: number;
+  voidedCount: number;
+  period?: string;
 }
 
 interface PaymentSummaryCardsProps {
@@ -45,8 +47,8 @@ export function PaymentSummaryCards({ summary, isLoading = false }: PaymentSumma
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {[ ...Array(4) ].map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {[ ...Array(5) ].map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-6 h-32"></CardContent>
           </Card>
@@ -56,7 +58,7 @@ export function PaymentSummaryCards({ summary, isLoading = false }: PaymentSumma
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
       <Card className="border-l-4 border-l-blue-500">
         <CardContent className="p-6">
           <div className="flex justify-between items-start">
@@ -77,7 +79,7 @@ export function PaymentSummaryCards({ summary, isLoading = false }: PaymentSumma
                   {showAmount ? <EyeOff className="h-6 w-6 text-blue-100 hover:text-blue-500" /> : <Eye className="h-6 w-6 text-blue-100 hover:text-blue-500" />}
                 </button>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">Pagos completados</p>
+              <p className="text-sm text-muted-foreground mt-1">Pagos válidos (al día + atrasados)</p>
             </div>
             <DollarSign className="h-8 w-8 text-blue-500" />
           </div>
@@ -119,6 +121,19 @@ export function PaymentSummaryCards({ summary, isLoading = false }: PaymentSumma
               <p className="text-sm text-muted-foreground mt-1">Requieren seguimiento</p>
             </div>
             <AlertTriangle className="h-8 w-8 text-red-500" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-l-4 border-l-gray-500 bg-gray-50 dark:bg-gray-950/20">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-1">Pagos Anulados</p>
+              <h3 className="text-2xl font-bold">{summary.voidedCount}</h3>
+              <p className="text-sm text-muted-foreground mt-1">Cancelados</p>
+            </div>
+            <XCircle className="h-8 w-8 text-gray-500" />
           </div>
         </CardContent>
       </Card>

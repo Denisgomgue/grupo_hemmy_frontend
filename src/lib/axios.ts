@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 let authToken: string | null = null;
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -18,11 +18,11 @@ api.interceptors.request.use(
     const token = authToken || Cookies.get('grupo_hemmy_auth');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+    }
+    return config;
   },
   error => {
-  return Promise.reject(error);
+    return Promise.reject(error);
   }
 );
 
@@ -33,11 +33,11 @@ api.interceptors.response.use(
     if (error.response) {
       // Error de autenticación
       if (error.response.status === 401) {
-      authToken = null;
-      Cookies.remove('grupo_hemmy_auth');
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
+        authToken = null;
+        Cookies.remove('grupo_hemmy_auth');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
       }
 
       // Mostrar mensaje de error

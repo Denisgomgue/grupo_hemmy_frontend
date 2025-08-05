@@ -1,0 +1,2 @@
+export { PermissionGuard, withPermission, usePermissionGuard } from './permission-guard';
+export { EnhancedPermissionMatrix } from './src/app/(main)/roles/permissions/_components/enhanced-permission-matrix'; 

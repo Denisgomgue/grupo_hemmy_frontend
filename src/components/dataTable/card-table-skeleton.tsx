@@ -6,20 +6,20 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 export function CardTableSkeleton() {
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 p-4">
             {[1, 2, 3].map((index) => (
                 <div
                     key={index}
-                    className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-700"
+                    className="bg-white dark:bg-violet-800 shadow rounded-lg p-6 border border-violet-200 dark:border-violet-700"
                 >
                     {[1, 2, 3, 4].map((headerIndex) => (
                         <div key={headerIndex} className="mb-2">
-                            <div className="h-4 w-1/4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
-                            <div className="h-6 w-3/4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                            <div className="h-4 w-1/4 bg-violet-200 dark:bg-violet-700 rounded mb-2"></div>
+                            <div className="h-6 w-3/4 bg-violet-200 dark:bg-violet-700 rounded"></div>
                         </div>
                     ))}
                     <div className="flex items-center justify-center mt-4">
-                        <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="h-8 w-24 bg-violet-200 dark:bg-violet-700 rounded"></div>
                     </div>
                 </div>
             ))}

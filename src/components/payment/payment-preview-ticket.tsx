@@ -102,10 +102,6 @@ export function PaymentPreviewTicket({ payment }: PaymentPreviewTicketProps) {
                         <span className="text-gray-900">{payment.client?.name}</span>
                     </div>
 
-                    {/* <div className="flex justify-between">
-                        <span className="text-gray-500 uppercase text-sm">DNI</span>
-                        <span className="text-gray-900">{payment.client?.dni}</span>
-                    </div> */}
                 </div>
 
                 {/* QR Code */}

@@ -12,7 +12,8 @@ import { toast } from "sonner"
 // Importar schema y tipo de Plan
 import { PlanFormData, PlanSchema } from "@/schemas/plan-schema"
 import api from "@/lib/axios"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { ModalContent, ModalBody, ModalHeader, ModalFooter } from "@/components/ui/modal-content"
 // Importar tipo de Plan y Service
 import { Plan } from "@/types/plans/plan"
 import { Service } from "@/types/services/service"
@@ -76,133 +77,136 @@ export function PlanForm({ onSave, onClose, isEdit, open, loading: externalLoadi
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px] max-w-full max-h-[80vh] overflow-auto">
-                <DialogHeader>
-                    {/* Cambiar título */}
-                    <DialogTitle>{isEdit ? "Editar Plan" : "Nuevo Plan"}</DialogTitle>
-                    {/* Cambiar descripción */}
-                    <DialogDescription>Ingrese los detalles del plan aquí.</DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSave)} className="space-y-4">
-                        {/* Campo Nombre */}
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Nombre del Plan</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} placeholder="Ingrese el nombre del plan" value={field.value || ''} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Campo Servicio (Selector) */}
-                        <FormField
-                            control={form.control}
-                            name="service"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Servicio Asociado</FormLabel>
-                                    <Select 
-                                        onValueChange={(value) => field.onChange(value ? parseInt(value, 10) : undefined)} 
-                                        defaultValue={field.value?.toString()}
-                                    >
+            <ModalContent size="xl" maxHeight="85vh">
+                <ModalHeader border>
+                    <DialogHeader>
+                        <DialogTitle>{isEdit ? "Editar Plan" : "Nuevo Plan"}</DialogTitle>
+                        <DialogDescription>Ingrese los detalles del plan aquí.</DialogDescription>
+                    </DialogHeader>
+                </ModalHeader>
+                <ModalBody>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSave)} className="space-y-4">
+                            {/* Campo Nombre */}
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Nombre del Plan</FormLabel>
                                         <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Seleccione un servicio" />
-                                            </SelectTrigger>
+                                            <Input {...field} placeholder="Ingrese el nombre del plan" value={field.value || ''} />
                                         </FormControl>
-                                        <SelectContent>                                
-                                            {services.map((service) => (
-                                                <SelectItem key={service.id} value={service.id.toString()}>
-                                                    {service.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                         {/* Campo Velocidad (Speed) */}
-                        <FormField
-                            control={form.control}
-                            name="speed"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Velocidad (Mbps)</FormLabel>
-                                    <FormControl>
-                                        <Input 
-                                            type="number" 
-                                            {...field} 
-                                            placeholder="Ingrese la velocidad" 
-                                            value={field.value ?? ''} 
-                                            onChange={e => field.onChange(parseInt(e.target.value) || 0)} 
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                            {/* Campo Servicio (Selector) */}
+                            <FormField
+                                control={form.control}
+                                name="service"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Servicio Asociado</FormLabel>
+                                        <Select 
+                                            onValueChange={(value) => field.onChange(value ? parseInt(value, 10) : undefined)} 
+                                            defaultValue={field.value?.toString()}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Seleccione un servicio" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>                                
+                                                {services.map((service) => (
+                                                    <SelectItem key={service.id} value={service.id.toString()}>
+                                                        {service.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        {/* Campo Precio */}
-                        <FormField
-                            control={form.control}
-                            name="price"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Precio</FormLabel>
-                                    <FormControl>
-                                        <Input 
-                                            type="number" 
-                                            step="0.01" // Para permitir decimales
-                                            {...field} 
-                                            placeholder="Ingrese el precio" 
-                                            value={field.value ?? ''} 
-                                            onChange={e => field.onChange(parseFloat(e.target.value) || 0)} 
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                             {/* Campo Velocidad (Speed) */}
+                            <FormField
+                                control={form.control}
+                                name="speed"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Velocidad (Mbps)</FormLabel>
+                                        <FormControl>
+                                            <Input 
+                                                type="number" 
+                                                {...field} 
+                                                placeholder="Ingrese la velocidad" 
+                                                value={field.value ?? ''} 
+                                                onChange={e => field.onChange(parseInt(e.target.value) || 0)} 
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        {/* Campo Descripción */}
-                        <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Descripción</FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            {...field}
-                                            placeholder="Ingrese la descripción (opcional)"
-                                            value={field.value || ''}
-                                            className="resize-none" // Opcional: deshabilitar redimensionar
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                            {/* Campo Precio */}
+                            <FormField
+                                control={form.control}
+                                name="price"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Precio</FormLabel>
+                                        <FormControl>
+                                            <Input 
+                                                type="number" 
+                                                step="0.01" // Para permitir decimales
+                                                {...field} 
+                                                placeholder="Ingrese el precio" 
+                                                value={field.value ?? ''} 
+                                                onChange={e => field.onChange(parseFloat(e.target.value) || 0)} 
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <div className="flex justify-end gap-4 pt-4">
-                            <Button type="button" variant="outline" onClick={onClose}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={externalLoading}>
-                                {externalLoading ? "Guardando..." : "Guardar"}
-                            </Button>
-                        </div>
-                    </form>
-                </Form>
-            </DialogContent>
+                            {/* Campo Descripción */}
+                            <FormField
+                                control={form.control}
+                                name="description"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Descripción</FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                {...field}
+                                                placeholder="Ingrese la descripción (opcional)"
+                                                value={field.value || ''}
+                                                className="resize-none" // Opcional: deshabilitar redimensionar
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </form>
+                    </Form>
+                </ModalBody>
+                <ModalFooter border>
+                    <div className="flex justify-end gap-4 w-full">
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" disabled={externalLoading} onClick={form.handleSubmit(onSave)}>
+                            {externalLoading ? "Guardando..." : "Guardar"}
+                        </Button>
+                    </div>
+                </ModalFooter>
+            </ModalContent>
         </Dialog>
     )
 } 

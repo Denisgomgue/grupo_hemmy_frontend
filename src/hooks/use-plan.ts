@@ -24,7 +24,7 @@ export function usePlans() {
         }
     }, [])
 
-    const refreshPlans = useCallback(async (page: number = 1, pageSize: number = 10) => {
+    const refreshPlans = useCallback(async (page: number = 1, pageSize: number = 1000) => {
         try {
             const response = await api.get<Plan[]>("/plans", {
                 params: {
@@ -46,10 +46,15 @@ export function usePlans() {
         listeners.push(listener)
         getMaxPrice() // Obtener el precio máximo al montar el componente
 
+        // Cargar planes automáticamente si no hay planes cargados
+        if (planList.length === 0) {
+            refreshPlans()
+        }
+
         return () => {
             listeners = listeners.filter((l) => l !== listener)
         }
-    }, [ getMaxPrice ])
+    }, [ getMaxPrice, refreshPlans ])
 
     return { plans, refreshPlans, maxPrice, getMaxPrice }
 }

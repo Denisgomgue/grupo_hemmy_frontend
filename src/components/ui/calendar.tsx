@@ -10,25 +10,144 @@ import { buttonVariants } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
 import { ScrollArea } from "./scroll-area"
 
-export type CalendarProps = React.ComponentProps<typeof DayPicker>
+export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
+  variant?: "default" | "birthdate" | "future" | "wide-range" | "payment-date"
+}
 
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  variant = "default",
   ...props
 }: CalendarProps) {
+  // Crear locale personalizado con meses capitalizados
+  const customLocale = React.useMemo(() => {
+    const capitalize = (str: string) => {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    };
+
+    return {
+      ...es,
+      localize: {
+        ...es.localize,
+        month: (n: any) => {
+          const monthName = es.localize?.month(n) || '';
+          return capitalize(monthName);
+        },
+      },
+    };
+  }, []);
+
+  // Configuración según la variante
+  const getVariantConfig = () => {
+    const currentYear = new Date().getFullYear();
+
+    switch (variant) {
+      case "birthdate":
+        return {
+          fromYear: 1925,                      // Desde 1995
+          toYear: 2008,                        // Hasta 2008
+          defaultMonth: new Date(2008, 0),     // Empezar en el año 2000
+        };
+      case "future":
+        return {
+          fromYear: currentYear,       // Solo año actual
+          toYear: currentYear,         // Solo año actual
+          defaultMonth: new Date(),    // Mes actual
+        };
+      case "wide-range":
+        return {
+          fromYear: 1900,
+          toYear: currentYear + 50,
+          defaultMonth: new Date(), // Mes actual
+        };
+        // solo el año actual y desde el mes actual a 2 meses
+      case "payment-date":
+        return {
+          fromYear: currentYear,
+          toYear: currentYear,
+          defaultMonth: new Date(), // Mes actual
+          fromMonth: new Date().getMonth(),
+          toMonth: new Date().getMonth() + 1,
+        };
+      default:
+        return {
+          fromYear: currentYear - 10,
+          toYear: currentYear + 10,
+          defaultMonth: new Date(), // Mes actual
+        };
+    }
+  };
+
+  const config = getVariantConfig();
+
+  // Aplicar estilos personalizados al dropdown
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .rdp select {
+        border: none !important;
+        outline: none !important;
+        background: #49008d09 !important;
+        cursor: pointer !important;
+        width: 100% !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+        background-image: none !important;
+        
+      }
+      .rdp select::-ms-expand {
+        display: none !important;
+      }
+      .rdp select:focus {
+        ring: 1px solid hsl(var(--primary)) !important;
+      }
+      .rdp select option {
+        background: hsl(var(--background)) !important;
+        color: hsl(var(--foreground)) !important;
+        padding: 8px !important;
+        // border: 20px solid #8b5cf6 !important;
+        // margin: 2px !important;
+        
+      }
+      .rdp select option:hover {
+        background: hsl(var(--accent)) !important;
+        border-color: #7c3aed !important;
+      }
+      .rdp select option:checked {
+        background: #8b5cf6 !important;
+        color: white !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
     <DayPicker
-      locale={es}
+      locale={customLocale}
       showOutsideDays={showOutsideDays}
+      captionLayout="dropdown-buttons"
+      fromYear={config.fromYear}
+      toYear={config.toYear}
+      defaultMonth={config.defaultMonth}
       className={cn("w-full p-3", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4 w-full",
-        caption: "flex justify-between items-center px-2 pt-1",
-        caption_label: "text-sm font-medium",
-        caption_dropdowns: "flex items-center px-4",
+        caption: "flex justify-center items-center px-2 pt-1 relative",
+        caption_label: "hidden", // Oculta el texto que aparece debajo de los dropdowns
+        caption_dropdowns: "flex justify-between gap-2",
+        dropdown: "h-8 text-sm bg-background px-2 hover:bg-accent focus:ring-1 transition-colors rounded-md cursor-pointer",
+        dropdown_icon: "hidden",
+        dropdown_month: "w-[120px] cursor-pointer",
+        dropdown_year: "w-[80px] cursor-pointer",
+        vhidden: "hidden", // Oculta los labels "Month:" y "Year:"
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
@@ -56,43 +175,6 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Dropdown: ({ value, onChange, children, ...props }) => {
-          const options = React.Children.toArray(children) as React.ReactElement[];
-          //@ts-ignore
-          const selected = options.find((child) => child.props.value === value);
-
-          const handleChange = (newValue: string) => {
-            const fakeEvent = {
-              target: { value: newValue },
-            } as unknown as React.ChangeEvent<HTMLSelectElement>;
-
-            onChange?.(fakeEvent);
-          };
-
-          return (
-            <Select value={value?.toString()} onValueChange={handleChange}>
-              <SelectTrigger className="h-8 w-[100px] text-sm border-none bg-transparent px-2 hover:bg-accent">
-                {/**@ts-ignore */}
-                <SelectValue>{selected?.props?.children}</SelectValue>
-              </SelectTrigger>
-              <SelectContent position="popper" className="w-[120px] p-0">
-                <ScrollArea className="h-60">
-                  {options.map((option, i) => (
-                    <SelectItem
-                      //@ts-ignore
-                      key={option.props.value || i}
-                      //@ts-ignore
-                      value={option.props.value?.toString() ?? ""}
-                    >
-                      {/**@ts-ignore */}
-                      {option.props.children}
-                    </SelectItem>
-                  ))}
-                </ScrollArea>
-              </SelectContent>
-            </Select>
-          );
-        },
         IconLeft: () => <ChevronLeft className="h-4 w-4" />,
         IconRight: () => <ChevronRight className="h-4 w-4" />,
       }}

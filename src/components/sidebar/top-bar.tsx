@@ -10,7 +10,7 @@ import {
 import { Maximize2, LogOut, Menu, Lock, CircleUser, PartyPopper } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { useEffect, useState } from "react"
-import { NotificationsMenu } from "./notifications"
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown"
 import { ThemeSettings } from "./theme-settings"
 import { useTheme } from "@/contexts/ThemeContext"
 import { useRouter } from "next/navigation"
@@ -23,9 +23,9 @@ interface TopBarProps {
 export function TopBar({ onMenuToggle, sidebarCollapsed }: TopBarProps) {
   const { user, logout } = useAuth()
   const { layoutMode } = useTheme()
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [ isFullscreen, setIsFullscreen ] = useState(false)
   const router = useRouter()
-  const [isMobile, setIsMobile] = useState(false)
+  const [ isMobile, setIsMobile ] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -80,7 +80,7 @@ export function TopBar({ onMenuToggle, sidebarCollapsed }: TopBarProps) {
             <Maximize2 className="h-5 w-5" />
           </Button>
 
-          <NotificationsMenu />
+          <NotificationDropdown />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -96,7 +96,7 @@ export function TopBar({ onMenuToggle, sidebarCollapsed }: TopBarProps) {
                   )}
                 </Avatar>
                 <span className="text-sm font-medium">
-                  {user ? `${user.name?.split(" ")[0] || ""} ${user.surname?.split(" ")[0] || ""}`.trim() : "Usuario"}
+                  {user ? `${user.name?.split(" ")[ 0 ] || ""} ${user.surname?.split(" ")[ 0 ] || ""}`.trim() : "Usuario"}
                 </span>
               </Button>
             </DropdownMenuTrigger>
@@ -104,7 +104,7 @@ export function TopBar({ onMenuToggle, sidebarCollapsed }: TopBarProps) {
               <div className="px-4 py-3 flex items-center space-x-1">
                 <p className="text-sm">Bienvenido</p>
                 <p className="truncate text-sm font-medium text-primary">{user?.name}</p>
-                <PartyPopper className="h-4 w-4 text-muted-foreground"/>
+                <PartyPopper className="h-4 w-4 text-muted-foreground" />
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => router.push('/profile')}>

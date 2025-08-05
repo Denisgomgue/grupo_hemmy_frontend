@@ -1,24 +1,25 @@
 "use client"
 
 import * as React from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
 import type { Payment } from "@/types/payments/payment"
-import { usePayments } from "@/hooks/use-payment"
+import { usePaymentQuery } from "@/hooks/use-payment-query"
 import { PaymentForm } from "./_components/payment-form"
 import { ResponsiveTable } from "@/components/responsive-table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { MainContainer } from "@/components/layout/main-container"
 import { HeaderActions } from "@/components/layout/header-actions"
 import { AddButton } from "@/components/layout/add-button"
 import { ReloadButton } from "@/components/layout/reload-button"
 import type { PaymentFormData } from "@/schemas/payment-schema"
-import { baseColumns } from "./_components/columns"
+import { createBaseColumns } from "./_components/columns"
 import { headers } from "./_components/headers"
 import { PaymentActionsDropdown } from "./_components/payment-actions-dropdown"
 import { PaymentCard } from "./_components/payment-card"
 import { PaymentSummaryCards } from "@/components/payment/payment-summary-cards"
 import { PaymentFilterTabs } from "./_components/payment-filter-tabs"
+import { PaymentDetailModal } from "@/components/payment/payment-detail-modal"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { LayoutGrid, List, Search } from "lucide-react"
@@ -31,6 +32,7 @@ import { TableToolbar } from "@/components/dataTable/table-toolbar"
 import { useDebounce } from "@/hooks/use-debounce"
 import { toast } from "sonner"
 import api from "@/lib/axios"
+
 import {
   Tooltip,
   TooltipContent,
@@ -38,158 +40,223 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Settings2 } from "lucide-react"
+import { usePaymentFilters } from '@/hooks/use-payment-filters'
 
 export default function PaymentPage() {
   const queryClient = useQueryClient()
   const { toast: useToastToast } = useToast()
-  const [ isModalOpen, setIsModalOpen ] = useState(false)
-  const [ selectedPayment, setSelectedPayment ] = useState<Payment | null>(null)
+
+  // Usar el nuevo hook con React Query
+  const {
+    refreshPayments,
+    getPaymentSummary,
+    createPayment,
+    updatePayment,
+    deletePayment,
+    regeneratePaymentCodes
+  } = usePaymentQuery()
+
+  // Estados para filtros y paginación
+  const [ searchTerm, setSearchTerm ] = useState("")
+  const [ filters, setFilters ] = useState({ status: 'all' })
   const [ currentPage, setCurrentPage ] = useState(1)
   const [ pageSize, setPageSize ] = useState(10)
-  const [ totalRecords, setTotalRecords ] = useState(0)
-  const [ currentFilter, setCurrentFilter ] = useState("ALL")
-  const [ searchTerm, setSearchTerm ] = useState("")
-  const [ localSearchTerm, setLocalSearchTerm ] = useState("")
   const [ viewMode, setViewMode ] = useState<"list" | "grid">("list")
-  const [ isRegeneratingCodes, setIsRegeneratingCodes ] = useState(false)
-  const [ paymentSummary, setPaymentSummary ] = useState({
+
+
+
+  // Query para obtener pagos
+  const {
+    data: paymentsQuery,
+    isFetching: isFetchingPayments,
+    refetch: refetchPayments
+  } = useQuery({
+    queryKey: [ "payments", currentPage, pageSize, filters.status, searchTerm ],
+    queryFn: () => refreshPayments(currentPage, pageSize, filters.status as any, searchTerm || ""),
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  })
+
+  // Query para obtener resumen de pagos
+  const {
+    data: summaryQuery,
+    isFetching: isFetchingSummary
+  } = useQuery({
+    queryKey: [ "paymentSummary" ],
+    queryFn: () => getPaymentSummary(),
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  })
+
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: createPayment,
+    onSuccess: () => {
+      toast.success("✅ Pago creado correctamente")
+      queryClient.invalidateQueries({ queryKey: [ "payments" ] })
+      queryClient.invalidateQueries({ queryKey: [ "paymentSummary" ] })
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || "Error al crear pago"
+      toast.error(`❌ ${errorMessage}`)
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updatePayment(id, data),
+    onSuccess: () => {
+      toast.success("✅ Pago actualizado correctamente")
+      queryClient.invalidateQueries({ queryKey: [ "payments" ] })
+      queryClient.invalidateQueries({ queryKey: [ "paymentSummary" ] })
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || "Error al actualizar pago"
+      toast.error(`❌ ${errorMessage}`)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deletePayment,
+    onSuccess: () => {
+      toast.success("✅ Pago eliminado correctamente")
+      queryClient.invalidateQueries({ queryKey: [ "payments" ] })
+      queryClient.invalidateQueries({ queryKey: [ "paymentSummary" ] })
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || "Error al eliminar pago"
+      toast.error(`❌ ${errorMessage}`)
+    },
+  })
+
+  const regenerateCodesMutation = useMutation({
+    mutationFn: regeneratePaymentCodes,
+    onSuccess: (result) => {
+      toast.success(`🔄 Se procesaron ${result.total} pagos. ${result.updated} actualizados.`)
+      queryClient.invalidateQueries({ queryKey: [ "payments" ] })
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || "Error al regenerar códigos"
+      toast.error(`❌ ${errorMessage}`)
+    },
+  })
+
+  // Estados del modal
+  const [ isModalOpen, setIsModalOpen ] = useState(false)
+  const [ selectedPayment, setSelectedPayment ] = useState<Payment | null>(null)
+  const [ isPaymentDetailModalOpen, setIsPaymentDetailModalOpen ] = useState(false)
+  const [ isSelectionModalOpen, setIsSelectionModalOpen ] = useState(false)
+  const [ selectedPaymentType, setSelectedPaymentType ] = useState<"payment" | "postponement" | null>(null)
+
+  // Estados de carga
+  const isLoadingMutation = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
+  const isFetchingOrMutating = isFetchingPayments || isFetchingSummary || isLoadingMutation
+
+  // Datos procesados
+  const payments = paymentsQuery?.data || []
+  const totalRecords = paymentsQuery?.total || 0
+  const paymentSummary = summaryQuery || {
     totalRecaudado: 0,
     pagosPagados: 0,
     pagosPendientes: 0,
     pagosAtrasados: 0,
+    pagosAnulados: 0,
     periodoUtilizado: 'thisMonth'
-  })
-  const [ isLoading, setIsLoading ] = useState(false)
-  const [ isSubmitting, setIsSubmitting ] = useState(false)
-  const debouncedSearchTerm = useDebounce(searchTerm, 700)
-
-  const {
-    refreshPayments,
-    payments,
-    createPayment,
-    updatePayment,
-    deletePayment,
-    getPaymentSummary,
-    regeneratePaymentCodes
-  } = usePayments()
-
-  // Filtrado local de pagos
-  const filteredPayments = useMemo(() => {
-    if (!localSearchTerm) return payments;
-
-    return payments.filter(payment => {
-      const searchTermLower = localSearchTerm.toLowerCase();
-      return (
-        payment.client.name.toLowerCase().includes(searchTermLower) ||
-        payment.client.lastName.toLowerCase().includes(searchTermLower) ||
-        payment.client.dni.toLowerCase().includes(searchTermLower) ||
-        payment.reference?.toLowerCase().includes(searchTermLower) ||
-        payment.amount.toString().includes(searchTermLower) ||
-        payment.paymentType.toLowerCase().includes(searchTermLower)
-      );
-    });
-  }, [ payments, localSearchTerm ]);
-
-  // Efecto para búsqueda en backend cuando sea necesario
-  useEffect(() => {
-    if (debouncedSearchTerm !== localSearchTerm) {
-      loadPayments();
-    }
-  }, [ debouncedSearchTerm ]);
-
-  // Cargar pagos
-  const loadPayments = async () => {
-    setIsLoading(true)
-    try {
-      const result = await refreshPayments(currentPage, pageSize, currentFilter, searchTerm)
-      setTotalRecords(result.total)
-    } catch (error) {
-      console.error('Error al cargar pagos:', error)
-      useToastToast({
-        title: "Error al cargar pagos",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
   }
 
-  // Cargar resumen de pagos
-  const loadPaymentSummary = async () => {
-    try {
-      const summary = await getPaymentSummary()
-      setPaymentSummary(summary)
-    } catch (error) {
-      console.error('Error al cargar resumen:', error)
-    }
-  }
-
-  // Cargar datos al cambiar los filtros
-  useEffect(() => {
-    loadPayments()
-  }, [ currentPage, pageSize, currentFilter, searchTerm ])
-
-  // Cargar resumen al inicio
-  useEffect(() => {
-    loadPaymentSummary()
-  }, [])
+  // Paginación de pagos
+  const paginatedPayments = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    return payments.slice(startIndex, endIndex)
+  }, [ payments, currentPage, pageSize ])
 
   const handleAdd = () => {
+    setIsSelectionModalOpen(true)
+  }
+
+  const handlePaymentTypeSelection = (type: "payment" | "postponement") => {
+    setSelectedPaymentType(type)
+    setIsSelectionModalOpen(false)
     setSelectedPayment(null)
     setIsModalOpen(true)
   }
 
+  const handleCloseSelectionModal = () => {
+    setIsSelectionModalOpen(false)
+    setSelectedPaymentType(null)
+  }
+
   const handleEdit = (payment: Payment) => {
+    // Determinar el tipo de edición basado en el status del pago
+    const isPostponement = payment.status === 'PENDING' && payment.engagementDate;
+
+    if (isPostponement) {
+      // Si es un aplazamiento, abrir modal de edición de aplazamiento
+      setSelectedPayment(payment)
+      setSelectedPaymentType("postponement")
+      setIsModalOpen(true)
+    } else {
+      // Si es un pago normal, abrir modal de edición de pago
+      setSelectedPayment(payment)
+      setSelectedPaymentType("payment")
+      setIsModalOpen(true)
+    }
+  }
+
+  const handlePaymentClick = (payment: Payment) => {
     setSelectedPayment(payment)
-    setIsModalOpen(true)
+    setIsPaymentDetailModalOpen(true)
+  }
+
+  const handleClosePaymentDetailModal = () => {
+    setIsPaymentDetailModalOpen(false)
+    setSelectedPayment(null)
+  }
+
+  const handleEditFromDetail = (payment: Payment) => {
+    // Determinar el tipo de edición basado en el status del pago
+    const isPostponement = payment.status === 'PENDING' && payment.engagementDate;
+
+    if (isPostponement) {
+      // Si es un aplazamiento, abrir modal de edición de aplazamiento
+      setSelectedPayment(payment)
+      setSelectedPaymentType("postponement")
+      setIsPaymentDetailModalOpen(false)
+      setIsModalOpen(true)
+    } else {
+      // Si es un pago normal, abrir modal de edición de pago
+      setSelectedPayment(payment)
+      setSelectedPaymentType("payment")
+      setIsPaymentDetailModalOpen(false)
+      setIsModalOpen(true)
+    }
   }
 
   const handleDelete = async (paymentId: string) => {
     const idAsNumber = Number.parseInt(paymentId, 10)
     if (isNaN(idAsNumber)) {
-      useToastToast({ title: "ID de pago inválido", variant: "destructive" })
+      toast.error("❌ ID de pago inválido")
       return
     }
 
-    setIsLoading(true)
     try {
-      await deletePayment(idAsNumber)
-      useToastToast({ title: "Pago eliminado correctamente" })
-      loadPayments()
-      loadPaymentSummary()
+      await deleteMutation.mutateAsync(idAsNumber)
     } catch (error) {
       console.error('Error al eliminar pago:', error)
-      useToastToast({
-        title: "Error al eliminar pago",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+      toast.error("❌ Error al eliminar el pago")
     }
   }
 
   const handleSave = async (values: PaymentFormData) => {
-    setIsSubmitting(true)
     try {
       if (selectedPayment) {
-        await updatePayment(selectedPayment.id, values)
-        useToastToast({ title: "Pago actualizado correctamente" })
+        await updateMutation.mutateAsync({ id: selectedPayment.id, data: values })
       } else {
-        await createPayment(values)
-        useToastToast({ title: "Pago creado correctamente" })
+        await createMutation.mutateAsync(values)
       }
       setIsModalOpen(false)
       setSelectedPayment(null)
-      loadPayments()
-      loadPaymentSummary()
     } catch (error) {
       console.error('Error al guardar pago:', error)
-      useToastToast({
-        title: `Error al ${selectedPayment ? "actualizar" : "crear"} pago`,
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
+      toast.error("❌ Error al guardar el pago")
     }
   }
 
@@ -199,31 +266,31 @@ export default function PaymentPage() {
   }
 
   const handleReload = () => {
-    loadPayments()
-    loadPaymentSummary()
+    try {
+      refetchPayments()
+      queryClient.invalidateQueries({ queryKey: [ "paymentSummary" ] })
+      toast.success("🔄 Datos recargados correctamente")
+    } catch (error) {
+      console.error('Error al recargar datos:', error)
+      toast.error("❌ Error al recargar los datos")
+    }
   }
 
   const handleFilterChange = (filter: string) => {
-    setCurrentFilter(filter)
+    setFilters({ status: filter as any })
     setCurrentPage(1)
   }
 
   const handleSearch = (value: string) => {
-    setLocalSearchTerm(value);
-    // Si hay más de 5 caracteres, activamos la búsqueda en backend
-    if (value.length > 8) {
-      setSearchTerm(value);
-    } else {
-      setSearchTerm("");
-    }
-  };
+    setSearchTerm(value)
+  }
 
   const handleSetViewMode = (mode: string) => {
     if (mode === "list" || mode === "grid") setViewMode(mode)
   }
 
   const paymentColumns = React.useMemo((): ColumnDef<Payment>[] => {
-    const columnsBase = baseColumns
+    const columnsBase = createBaseColumns(handlePaymentClick)
 
     return [
       ...columnsBase,
@@ -237,35 +304,28 @@ export default function PaymentPage() {
         ),
       },
     ]
-  }, [ handleDelete, handleEdit ])
+  }, [ handleDelete, handleEdit, handlePaymentClick ])
 
   const recalculatePaymentStates = async () => {
     try {
       const response = await api.post('/payments/recalculate-states');
-      toast.success(`Estados actualizados: ${response.data.message}`);
+      toast.success(`✅ Estados actualizados: ${response.data.message}`);
       // Recargar la lista de pagos
-      await loadPayments();
+      queryClient.invalidateQueries({ queryKey: [ "payments" ] })
     } catch (error) {
-      toast.error('Error al recalcular los estados de pago');
-      console.error('Error:', error);
+      console.error('Error al recalcular estados:', error)
+      toast.error("❌ Error al recalcular los estados de pago");
     }
   };
 
   const handleRegenerateCodes = async () => {
-    if (isRegeneratingCodes) return;
+    if (regenerateCodesMutation.isPending) return;
 
     try {
-      setIsRegeneratingCodes(true);
-      const result = await regeneratePaymentCodes();
-      toast.success(
-        `Se procesaron ${result.total} pagos. ${result.updated} actualizados.`
-      );
-      await loadPayments();
+      await regenerateCodesMutation.mutateAsync();
     } catch (error) {
-      console.error('Error al regenerar códigos:', error);
-      toast.error("Error al regenerar los códigos de pago");
-    } finally {
-      setIsRegeneratingCodes(false);
+      console.error('Error al regenerar códigos:', error)
+      toast.error("❌ Error al regenerar los códigos de pago");
     }
   };
 
@@ -273,8 +333,8 @@ export default function PaymentPage() {
     <MainContainer>
       <HeaderActions title="Registro de Pagos">
         <div className="flex items-center gap-2">
-          <ReloadButton onClick={handleReload} disabled={isLoading} />
-          <AddButton onClick={handleAdd} disabled={isLoading} />
+          <ReloadButton onClick={handleReload} disabled={isFetchingOrMutating} />
+          <AddButton onClick={handleAdd} disabled={isFetchingOrMutating} />
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -282,7 +342,7 @@ export default function PaymentPage() {
                   variant="outline"
                   size="icon"
                   onClick={handleRegenerateCodes}
-                  disabled={isRegeneratingCodes || isLoading}
+                  disabled={regenerateCodesMutation.isPending || isFetchingOrMutating}
                 >
                   <Settings2 className="h-4 w-4" />
                 </Button>
@@ -301,22 +361,24 @@ export default function PaymentPage() {
           totalCollected: paymentSummary.totalRecaudado,
           paidCount: paymentSummary.pagosPagados,
           pendingCount: paymentSummary.pagosPendientes,
-          lateCount: paymentSummary.pagosAtrasados
+          lateCount: paymentSummary.pagosAtrasados,
+          voidedCount: paymentSummary.pagosAnulados,
+          period: String(paymentSummary.periodoUtilizado)
         }}
-        isLoading={isLoading}
+        isLoading={isFetchingSummary}
       />
 
       {/* Filter Tabs */}
       <PaymentFilterTabs
-        currentFilter={currentFilter}
+        currentFilter={filters.status || 'all'}
         onFilterChange={handleFilterChange}
-        isLoading={isLoading}
+        isLoading={isFetchingOrMutating}
       />
 
       {/* Search and View Controls */}
       <div className="flex items-center justify-between mb-6">
         <TableToolbar
-          value={localSearchTerm}
+          value={searchTerm}
           onValueChange={handleSearch}
           searchPlaceholder="Buscar por cliente, DNI, monto..."
           filters={
@@ -347,8 +409,8 @@ export default function PaymentPage() {
         <ResponsiveTable
           headers={headers}
           columns={paymentColumns}
-          data={filteredPayments}
-          isLoading={isLoading}
+          data={paginatedPayments}
+          isLoading={isFetchingOrMutating}
           pagination={{
             currentPage,
             pageSize,
@@ -358,7 +420,7 @@ export default function PaymentPage() {
         />
       ) : (
         <PaginatedCards
-          data={filteredPayments}
+          data={paginatedPayments}
           totalRecords={totalRecords}
           pageSize={pageSize}
           onPaginationChange={handlePaginationChange}
@@ -368,24 +430,98 @@ export default function PaymentPage() {
               payment={payment}
               onEdit={() => handleEdit(payment)}
               onDelete={() => handleDelete(payment.id.toString())}
+              onViewDetails={handlePaymentClick}
             />
           )}
-          isLoading={isLoading}
+          isLoading={isFetchingOrMutating}
         />
       )}
 
       {/* Payment Form Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedPayment ? "Editar" : "Crear"} Pago</DialogTitle>
+            <DialogTitle>
+              {selectedPayment ? "Editar" : "Crear"} {selectedPaymentType === "postponement" ? "Aplazamiento" : "Pago"}
+            </DialogTitle>
           </DialogHeader>
           <PaymentForm
             payment={selectedPayment}
             onSubmit={handleSave}
-            isLoading={isSubmitting}
+            isLoading={isLoadingMutation}
             onCancel={() => setIsModalOpen(false)}
+            paymentType={selectedPaymentType}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Detail Modal */}
+      {selectedPayment && (
+        <PaymentDetailModal
+          payment={selectedPayment}
+          isOpen={isPaymentDetailModalOpen}
+          onClose={handleClosePaymentDetailModal}
+          onEdit={handleEditFromDetail}
+        />
+      )}
+
+      {/* Selection Modal */}
+      <Dialog open={isSelectionModalOpen} onOpenChange={setIsSelectionModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-[#5E3583]">Tipo de Registro</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Selecciona el tipo de registro que deseas realizar
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Opción: Registro de Pago */}
+            <div
+              className="p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-[#5E3583] hover:bg-[#5E3583]/5 transition-all duration-200"
+              onClick={() => handlePaymentTypeSelection("payment")}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900">Registro de Pago</h3>
+                  <p className="text-sm text-gray-600">
+                    Registrar un pago real con método de pago, referencia y boleta
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Opción: Aplazamiento */}
+            <div
+              className="p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-[#5E3583] hover:bg-[#5E3583]/5 transition-all duration-200"
+              onClick={() => handlePaymentTypeSelection("postponement")}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900">Aplazamiento de Pago</h3>
+                  <p className="text-sm text-gray-600">
+                    Registrar un compromiso de pago con fecha alternativa (sin boleta)
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button variant="outline" onClick={handleCloseSelectionModal}>
+              Cancelar
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </MainContainer>

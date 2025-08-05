@@ -153,8 +153,8 @@ export function GeneralTable<TData, TValue>({
     }
 
     return (
-        <div className="w-full">
-            <ScrollArea className="w-full overflow-x-auto space-y-4">
+        <div className="mt-5">
+            <ScrollArea className="w-full overflow-x-auto">
                 <ScrollBar orientation="horizontal" className="top-0" />
                 <Table
                     className={cn(
@@ -173,7 +173,8 @@ export function GeneralTable<TData, TValue>({
                                             "text-[#5E3583] dark:text-purple-100 font-bold text-xs h-12 p-0 border-b border-[#5E3583]/10 dark:border-purple-700",
                                             "select-none cursor-pointer dark:hover:bg-[#3D2566] hover:bg-[#5E3583]/10",
                                             "hover:text-[#5E3583] dark:hover:text-white",
-                                            header.column.getIsSorted() && "bg-[#5E3583]/10 dark:bg-[#5E3583]/20"
+                                            header.column.getIsSorted() && "bg-[#5E3583]/10 dark:bg-[#5E3583]/20",
+                                            "px-4 py-3"
                                         )}
                                         onClick={header.column.getToggleSortingHandler()}
                                     >
@@ -215,7 +216,13 @@ export function GeneralTable<TData, TValue>({
                                     className="hover:bg-[#5E3583]/10 dark:hover:bg-[#3D2566] dark:border-[#5E3583]"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className="text-[#2D1843] dark:text-purple-100 border-b border-[#5E3583]/10 dark:border-purple-700">
+                                        <TableCell
+                                            key={cell.id}
+                                            className={cn(
+                                                "px-4 py-3 text-sm text-muted-foreground border-b border-[#5E3583]/10 dark:border-purple-700",
+                                                "align-middle"
+                                            )}
+                                        >
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}

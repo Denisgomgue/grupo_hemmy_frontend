@@ -1,65 +1,162 @@
-import { format, addMonths } from "date-fns";
-import { es } from "date-fns/locale";
-import type { Client } from "@/types/clients/client";
+import { format, formatDistanceToNow, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
 
-const parseUTCDate = (dateString: string): Date => {
-    const date = new Date(dateString);
-    // Ajustar la fecha para que sea UTC y mantener el mismo día
-    return new Date(Date.UTC(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        12, // Usar mediodía UTC para evitar problemas con zonas horarias
-        0,
-        0,
-        0
-    ));
-};
+export function formatDate(date: Date | string | undefined): string {
+    if (!date) return "N/A"
 
-const formatDateDisplay = (date: Date): string => {
-    return format(date, "dd/MM/yyyy", { locale: es });
-};
-
-export const getDisplayPaymentDate = (client: Client): { date: string; isFromInitial: boolean } => {
-    // Si hay una fecha de próximo pago, usarla
-    if (client.paymentDate) {
-        const paymentDate = parseUTCDate(client.paymentDate);
-        return {
-            date: formatDateDisplay(paymentDate),
-            isFromInitial: false
-        };
+    try {
+        const dateObj = typeof date === "string" ? parseISO(date) : date
+        return format(dateObj, "dd/MM/yyyy", { locale: es })
+    } catch (error) {
+        return "Fecha inválida"
     }
+}
 
-    // Si no hay fecha de próximo pago pero hay fecha inicial, calcular basado en la fecha inicial
-    if (client.initialPaymentDate) {
-        const initialDate = parseUTCDate(client.initialPaymentDate);
-        const today = new Date();
+export function formatDateTime(date: Date | string | undefined): string {
+    if (!date) return "N/A"
 
-        // Calcular cuántos meses han pasado desde la fecha inicial
-        let monthsDiff = (today.getFullYear() - initialDate.getFullYear()) * 12
-            + (today.getMonth() - initialDate.getMonth());
+    try {
+        const dateObj = typeof date === "string" ? parseISO(date) : date
+        return format(dateObj, "dd/MM/yyyy HH:mm", { locale: es })
+    } catch (error) {
+        return "Fecha inválida"
+    }
+}
 
-        // Si el día del mes actual es mayor que el día inicial, agregar un mes más
-        if (today.getDate() > initialDate.getDate()) {
-            monthsDiff++;
+export function formatTime(date: Date | string | undefined): string {
+    if (!date) return "N/A"
+
+    try {
+        const dateObj = typeof date === "string" ? parseISO(date) : date
+        return format(dateObj, "HH:mm", { locale: es })
+    } catch (error) {
+        return "Hora inválida"
+    }
+}
+
+export function formatRelativeTime(date: Date | string | undefined): string {
+    if (!date) return "N/A"
+
+    try {
+        const dateObj = typeof date === "string" ? parseISO(date) : date
+        return formatDistanceToNow(dateObj, { addSuffix: true, locale: es })
+    } catch (error) {
+        return "Fecha inválida"
+    }
+}
+
+export function formatDateRange(startDate: Date | string | undefined, endDate: Date | string | undefined): string {
+    if (!startDate || !endDate) return "N/A"
+
+    try {
+        const start = typeof startDate === "string" ? parseISO(startDate) : startDate
+        const end = typeof endDate === "string" ? parseISO(endDate) : endDate
+
+        const startFormatted = format(start, "dd/MM/yyyy", { locale: es })
+        const endFormatted = format(end, "dd/MM/yyyy", { locale: es })
+
+        return `${startFormatted} - ${endFormatted}`
+    } catch (error) {
+        return "Rango de fechas inválido"
+    }
+}
+
+export function isToday(date: Date | string | undefined): boolean {
+    if (!date) return false
+
+    try {
+        const dateObj = typeof date === "string" ? parseISO(date) : date
+        const today = new Date()
+
+        return format(dateObj, "yyyy-MM-dd") === format(today, "yyyy-MM-dd")
+    } catch (error) {
+        return false
+    }
+}
+
+export function isYesterday(date: Date | string | undefined): boolean {
+    if (!date) return false
+
+    try {
+        const dateObj = typeof date === "string" ? parseISO(date) : date
+        const yesterday = new Date()
+        yesterday.setDate(yesterday.getDate() - 1)
+
+        return format(dateObj, "yyyy-MM-dd") === format(yesterday, "yyyy-MM-dd")
+    } catch (error) {
+        return false
+    }
+}
+
+export function isThisWeek(date: Date | string | undefined): boolean {
+    if (!date) return false
+
+    try {
+        const dateObj = typeof date === "string" ? parseISO(date) : date
+        const today = new Date()
+        const weekAgo = new Date()
+        weekAgo.setDate(today.getDate() - 7)
+
+        return dateObj >= weekAgo && dateObj <= today
+    } catch (error) {
+        return false
+    }
+}
+
+export function isThisMonth(date: Date | string | undefined): boolean {
+    if (!date) return false
+
+    try {
+        const dateObj = typeof date === "string" ? parseISO(date) : date
+        const today = new Date()
+
+        return format(dateObj, "yyyy-MM") === format(today, "yyyy-MM")
+    } catch (error) {
+        return false
+    }
+}
+
+export function getAge(birthDate: Date | string | undefined): number | null {
+    if (!birthDate) return null
+
+    try {
+        const birth = typeof birthDate === "string" ? parseISO(birthDate) : birthDate
+        const today = new Date()
+
+        let age = today.getFullYear() - birth.getFullYear()
+        const monthDiff = today.getMonth() - birth.getMonth()
+
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age--
         }
 
-        // Calcular la próxima fecha de pago
-        const nextDate = addMonths(initialDate, monthsDiff + 1);
+        return age
+    } catch (error) {
+        return null
+    }
+}
 
-        return {
-            date: formatDateDisplay(nextDate),
-            isFromInitial: true
-        };
+export function formatDuration(minutes: number): string {
+    if (minutes < 60) {
+        return `${minutes} min`
     }
 
-    return {
-        date: "No definida",
-        isFromInitial: false
-    };
-};
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
 
-export const calculateNextPaymentDate = (baseDate: Date): Date => {
-    const utcDate = parseUTCDate(baseDate.toISOString());
-    return addMonths(utcDate, 1);
-}; 
+    if (remainingMinutes === 0) {
+        return `${hours}h`
+    }
+
+    return `${hours}h ${remainingMinutes}min`
+}
+
+export function formatFileSize(bytes: number): string {
+    if (bytes === 0) return "0 Bytes"
+
+    const k = 1024
+    const sizes = [ "Bytes", "KB", "MB", "GB", "TB" ]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[ i ]
+} 

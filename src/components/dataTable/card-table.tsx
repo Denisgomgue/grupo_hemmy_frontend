@@ -33,8 +33,8 @@ export function CardTable({
     onPaginationChange,
     isLoading = false,
 }: CardTableProps) {
-    const [currentPage, setCurrentPage] = useState(1)
-    const [currentPageSize, setCurrentPageSize] = useState(pageSize)
+    const [ currentPage, setCurrentPage ] = useState(1)
+    const [ currentPageSize, setCurrentPageSize ] = useState(pageSize)
 
     const totalPages = Math.ceil(totalRecords / currentPageSize)
 
@@ -111,14 +111,14 @@ export function CardTable({
         <div className="space-y-4">
             {data.map((item, index) => (
                 <div
-                    key={index}
+                    key={typeof item.id === 'string' || typeof item.id === 'number' ? item.id : index}
                     className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-700"
                 >
                     {headers.map((header) => (
                         <div key={header.key} className="mb-2 text-gray-900 dark:text-gray-100">
                             <div className="font-semibold text-sm">{header.label}:</div>
                             <div className="text-base font-medium">
-                                {header.render ? header.render(item[header.key], item) : item[header.key]}
+                                {header.render ? header.render(item[ header.key ], item) : item[ header.key ]}
                             </div>
                         </div>
                     ))}
@@ -140,7 +140,7 @@ export function CardTable({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent side="top">
-                                    {[5, 10, 20, 50].map((size) => (
+                                    {[ 5, 10, 20, 50 ].map((size) => (
                                         <SelectItem key={size} value={`${size}`}>
                                             {size}
                                         </SelectItem>

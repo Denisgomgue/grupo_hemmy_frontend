@@ -2,7 +2,7 @@
 
 import { type ElementRef, type ComponentPropsWithoutRef, useEffect, useState, useRef, forwardRef } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Edit, CreditCard, Ticket, MapPin, User as UserIcon, Phone, MessageSquare, Image, X, ZoomIn, ZoomOut, RotateCw, Download, Hand } from "lucide-react"
+import { ArrowLeft, Edit, CreditCard, Ticket, MapPin, User as UserIcon, Phone, MessageSquare, Image, X, ZoomIn, ZoomOut, RotateCw, Download, Hand, RefreshCw } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -23,10 +23,12 @@ import { getAccountStatusLabel } from "@/utils/account-status-labels"
 import { getClientPaymentStatusLabel } from "@/utils/client-payment-status-labels"
 import { PaymentDetailModal } from "@/components/payment/payment-detail-modal"
 import { ClientImageFill } from "@/components/ui/client-image"
-import { cn } from "@/lib/utils"
+import { cn, transformPaymentDataForBackend, validatePaymentData, formatDateForDisplay, calculateNextPaymentDateForDisplay } from "@/lib/utils"
+import { ComputerDesktopIcon } from "@heroicons/react/24/outline"
 
 export default function ClientDetailPage() {
-  const { id } = useParams<{ id: string }>()
+  const params = useParams<{ id: string }>()
+  const id = params?.id
   const router = useRouter()
   const { toast } = useToast()
   const [ client, setClient ] = useState<Client | null>(null)
@@ -100,33 +102,43 @@ export default function ClientDetailPage() {
     router.push(`/configuration/payment?client=${id}`)
   }
 
-  // Handler para abrir el modal de pago
-  const handleOpenPaymentModal = () => setIsPaymentModalOpen(true)
+  // Handler para abrir el modal de pago (siempre para nuevo pago)
+  const handleOpenPaymentModal = () => {
+    setSelectedPayment(null); // Asegurar que no hay pago seleccionado
+    setIsPaymentModalOpen(true);
+  }
+
   const handleClosePaymentModal = () => {
     setIsPaymentModalOpen(false);
     setSelectedPayment(null);
   };
 
-  // Handler para registrar el pago (puedes agregar lógica de recarga de pagos aquí)
+  // Handler para registrar un nuevo pago
   const handlePaymentSubmit = async (data: any) => {
     try {
-      if (selectedPayment?.id) {
-        // Si hay un pago seleccionado, actualizamos
-        await api.patch(`/payments/${selectedPayment.id}`, data);
+      // Transformar y validar datos del pago
+      const paymentData = transformPaymentDataForBackend(data);
+
+      // Validar que el cliente sea correcto
+      if (!validatePaymentData(paymentData)) {
         toast({
-          title: "Pago actualizado",
-          description: "El pago se actualizó correctamente.",
-          variant: "default",
+          title: "Error",
+          description: "Datos de cliente inválidos. Por favor, verifique la información.",
+          variant: "destructive",
         });
-      } else {
-        // Si no hay pago seleccionado, creamos uno nuevo
-        await api.post('/payments', data);
-        toast({
-          title: "Pago registrado",
-          description: "El pago se guardó correctamente.",
-          variant: "default",
-        });
+        return;
       }
+
+
+
+      // Siempre crear un nuevo pago (no actualizar)
+      await api.post('/payments', paymentData);
+
+      toast({
+        title: "Pago registrado",
+        description: "El pago se guardó correctamente.",
+        variant: "default",
+      });
 
       setIsPaymentModalOpen(false);
       setSelectedPayment(null);
@@ -136,11 +148,29 @@ export default function ClientDetailPage() {
       // Recargar los datos del cliente para actualizar su estado
       await fetchClientData();
 
-    } catch (error) {
-      console.error('Error al procesar el pago:', error);
+    } catch (error: any) {
+      console.error('Error al registrar el pago:', error);
+
+      // 🎯 MEJORA: Extraer mensaje específico del backend
+      let errorMessage = "No se pudo registrar el pago. Por favor, intente nuevamente.";
+
+      if (error.response?.data?.message) {
+        // Mensaje específico del backend (ej: validación de un pago por mes)
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 500) {
+        // Error interno del servidor
+        errorMessage = "Error interno del servidor. Por favor, contacte al administrador.";
+      } else if (error.response?.status === 400) {
+        // Error de validación
+        errorMessage = "Datos inválidos. Por favor, verifique la información.";
+      } else if (error.response?.status === 404) {
+        // Recurso no encontrado
+        errorMessage = "Cliente o recurso no encontrado.";
+      }
+
       toast({
-        title: "Error",
-        description: "No se pudo procesar el pago. Por favor, intente nuevamente.",
+        title: "Error al Registrar Pago",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -159,6 +189,8 @@ export default function ClientDetailPage() {
   const handleClosePaymentDetailModal = () => {
     setIsPaymentDetailModalOpen(false);
   };
+
+
 
   const handleDeletePayment = async (paymentId: string) => {
     try {
@@ -235,7 +267,16 @@ export default function ClientDetailPage() {
   }
 
   const getPaymentStateText = (state: PaymentStatus): string => {
-    return getPaymentStatusLabel(state)
+    switch (state) {
+      case PaymentStatus.PAYMENT_DAILY:
+        return "Pagado"
+      case PaymentStatus.PENDING:
+        return "Pendiente"
+      case PaymentStatus.LATE_PAYMENT:
+        return "Pago Tardío"
+      default:
+        return "Desconocido"
+    }
   }
 
   const getPaymentTypeText = (type: PaymentType): string => {
@@ -275,9 +316,9 @@ export default function ClientDetailPage() {
   }
 
   const handleDownload = () => {
-    if (client?.referenceImage) {
+    if (mainInstallation?.referenceImage && client) {
       const link = document.createElement('a')
-      link.href = typeof client.referenceImage === 'string' ? client.referenceImage : URL.createObjectURL(client.referenceImage)
+      link.href = typeof mainInstallation.referenceImage === 'string' ? mainInstallation.referenceImage : URL.createObjectURL(mainInstallation.referenceImage)
       link.download = `imagen_referencia_${client.name}_${client.lastName}.jpg`
       document.body.appendChild(link)
       link.click()
@@ -317,6 +358,8 @@ export default function ClientDetailPage() {
   }
 
   // Función para generar el enlace de WhatsApp
+
+
   const getWhatsAppLink = (phone: string) => {
     // Limpiamos el número de teléfono de cualquier carácter no numérico
     const cleanPhone = phone?.replace(/\D/g, '');
@@ -351,6 +394,10 @@ export default function ClientDetailPage() {
   }
 
   const initial = client.name ? client.name[ 0 ].toUpperCase() : "?"
+
+  // Extraer datos de la primera instalación (asumiendo que cada cliente tiene una instalación principal)
+  const mainInstallation = client.installations?.[ 0 ]
+  const paymentConfig = mainInstallation?.paymentConfig
 
   return (
     <div className="container mx-auto p-4">
@@ -438,7 +485,7 @@ export default function ClientDetailPage() {
                 <p className="text-sm font-medium text-gray-500">Sector</p>
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  <p className="font-medium text-gray-700">{client.sector?.name || "N/A"}</p>
+                  <p className="font-medium text-gray-700">{mainInstallation?.sector?.name || "N/A"}</p>
                 </div>
               </div>
             </div>
@@ -448,19 +495,19 @@ export default function ClientDetailPage() {
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-500">Estado de Pago</p>
                 <Badge
-                  variant={getPaymentStatusVariant(client.paymentStatus)}
+                  variant={getPaymentStatusVariant(paymentConfig?.paymentStatus || 'EXPIRING')}
                   className="font-medium px-3 py-1 text-xs"
                 >
-                  {getClientPaymentStatusLabel(client.paymentStatus)}
+                  {getClientPaymentStatusLabel(paymentConfig?.paymentStatus || ClientPaymentStatus.EXPIRING)}
                 </Badge>
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-500">Renta</p>
                 <Badge
-                  variant={client.advancePayment ? "outline" : "secondary"}
+                  variant={paymentConfig?.advancePayment ? "outline" : "secondary"}
                   className="font-medium px-3 py-1 text-xs"
                 >
-                  {client.advancePayment ? "Adelantada" : "Sin adelanto"}
+                  {paymentConfig?.advancePayment ? "Adelantada" : "Sin adelanto"}
                 </Badge>
               </div>
             </div>
@@ -492,19 +539,19 @@ export default function ClientDetailPage() {
             <div className="grid grid-cols-2 gap-6 mb-6 pb-4 border-b">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-500">Plan Actual</p>
-                <p className="font-medium text-gray-700">{client.plan?.name || "N/A"} - S/ {client.plan?.price || "0.00"} /mes</p>
+                <p className="font-medium text-gray-700">{mainInstallation?.plan?.name || "N/A"} - S/ {mainInstallation?.plan?.price || "0.00"} /mes</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-500">Tipo de Servicio</p>
-                <p className="font-medium text-gray-700">{client.plan?.service?.name || "N/A"}</p>
+                <p className="font-medium text-gray-700">{mainInstallation?.plan?.service?.name || "N/A"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-500">Velocidad</p>
-                <p className="font-medium text-gray-700">{client.plan?.speed || "N/A"} Mbps</p>
+                <p className="font-medium text-gray-700">{mainInstallation?.plan?.speed || "N/A"} Mbps</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-500">Dirección IP</p>
-                <p className="font-medium text-gray-700 font-mono">{client.ipAddress || "N/A"}</p>
+                <p className="font-medium text-gray-700 font-mono">{mainInstallation?.ipAddress || "N/A"}</p>
               </div>
             </div>
 
@@ -513,15 +560,13 @@ export default function ClientDetailPage() {
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-500">Fecha de Instalación</p>
                 <p className="font-medium text-gray-700">
-                  {client.installationDate
-                    ? format(new Date(client.installationDate), "dd/MM/yyyy", { locale: es })
-                    : "N/A"}
+                  {formatDateForDisplay(mainInstallation?.installationDate)}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-500">Próximo Pago</p>
                 <p className="font-medium text-gray-700">
-                  {client.paymentDate ? format(new Date(client.paymentDate), "dd/MM/yyyy", { locale: es }) : "N/A"}
+                  {calculateNextPaymentDateForDisplay(paymentConfig?.initialPaymentDate, payments.length)}
                 </p>
               </div>
             </div>
@@ -529,79 +574,59 @@ export default function ClientDetailPage() {
             {/* Grid de información técnica */}
             <div className="grid grid-cols-2 gap-6 mb-6 pb-4 border-b">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-500">Serie Router</p>
-                <p className="font-medium text-gray-700 font-mono">{client.routerSerial || "N/A"}</p>
+                <p className="text-sm font-medium text-gray-500">Referencia de Ubicación</p>
+                <p className="font-medium text-gray-700">{mainInstallation?.reference || "N/A"}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-500">Serie Decodificador</p>
-                <p className="font-medium text-gray-700 font-mono">{client.decoSerial || "N/A"}</p>
+                <p className="text-sm font-medium text-gray-500">Descripción</p>
+                <p className="font-medium text-gray-700">{client.description || "N/A"}</p>
               </div>
             </div>
 
-            {/* Botón de registro de pago */}
-            <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  className="w-full text-white font-medium"
-                  onClick={handleOpenPaymentModal}
-                >
-                  <CreditCard className="mr-2 h-4 w-4" /> Registrar Pago
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="w-full max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>{selectedPayment ? "Editar" : "Registrar"} Pago</DialogTitle>
-                </DialogHeader>
-                <PaymentForm
-                  onSubmit={handlePaymentSubmit}
-                  onCancel={handleClosePaymentModal}
-                  isLoading={false}
-                  hideClientSelection={false}
-                  preselectedClient={client}
-                  payment={selectedPayment ? {
-                    ...selectedPayment,
-                    client: selectedPayment.client
-                  } : {
-                    id: 0,
-                    code: '',
-                    client: {
-                      id: client.id,
-                      name: client.name,
-                      lastName: client.lastName,
-                      dni: client.dni,
-                      phone: client.phone || '',
-                      address: client.address || '',
-                      installationDate: client.installationDate,
-                      reference: client.reference,
-                      referenceImage: client.referenceImage || '',
-                      initialPaymentDate: client.initialPaymentDate,
-                      paymentDate: client.paymentDate,
-                      advancePayment: client.advancePayment || false,
-                      description: client.description || '',
-                      routerSerial: client.routerSerial || '',
-                      decoSerial: client.decoSerial || '',
-                      ipAddress: client.ipAddress || '',
-                      paymentStatus: client.paymentStatus,
-                      status: client.status,
-                      plan: client.plan,
-                      sector: client.sector
-                    },
-                    amount: Number(client.plan?.price) || 0,
-                    paymentDate: format(new Date(), 'yyyy-MM-dd'),
-                    dueDate: format(new Date(), 'yyyy-MM-dd'),
-                    paymentType: PaymentType.TRANSFER,
-                    reference: '',
-                    transfername: '',
-                    reconnection: false,
-                    discount: 0,
-                    state: PaymentStatus.PENDING,
-                    created_At: new Date().toISOString(),
-                    updated_At: new Date().toISOString(),
-                    advancePayment: false
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+            {/* Botones de acción */}
+            <div className="space-y-2">
+              <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    className="w-full text-white font-medium"
+                    onClick={handleOpenPaymentModal}
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" /> Registrar Pago
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="w-full max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Registrar Nuevo Pago</DialogTitle>
+                    <DialogDescription>
+                      Complete los datos del pago para {client.name} {client.lastName}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <PaymentForm
+                    onSubmit={handlePaymentSubmit}
+                    onCancel={handleClosePaymentModal}
+                    isLoading={false}
+                    hideClientSelection={true} // Ocultar selección de cliente ya que está pre-seleccionado
+                    preselectedClient={{
+                      ...client,
+                      plan: mainInstallation?.plan ? {
+                        id: mainInstallation.plan.id,
+                        name: mainInstallation.plan.name,
+                        price: Number(mainInstallation.plan.price),
+                        speed: mainInstallation.plan.speed,
+                        description: mainInstallation.plan.description,
+                        service: mainInstallation.plan.service,
+                        created_at: mainInstallation.plan.created_at,
+                        updated_at: mainInstallation.plan.updated_at
+                      } : undefined
+                    }}
+                    payment={null} // Siempre null para nuevo pago
+                  />
+                </DialogContent>
+              </Dialog>
+
+
+            </div>
+
           </CardContent>
         </Card>
       </div>
@@ -617,6 +642,9 @@ export default function ClientDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="location" className="flex items-center gap-2">
             <MapPin className="h-4 w-4" /> Ubicación
+          </TabsTrigger>
+          <TabsTrigger value="equipment" className="flex items-center gap-2">
+            <ComputerDesktopIcon className="h-4 w-4" /> Equipos
           </TabsTrigger>
         </TabsList>
 
@@ -666,10 +694,10 @@ export default function ClientDetailPage() {
                           : "N/A"}
                       </TableCell>
                       <TableCell>S/ {Number(payment.amount).toFixed(2)}</TableCell>
-                      <TableCell>{getPaymentTypeText(payment.paymentType)}</TableCell>
+                      <TableCell>{getPaymentTypeText(payment.paymentType || PaymentType.TRANSFER)}</TableCell>
                       <TableCell>
-                        <Badge variant={getPaymentStateVariant(payment.state)}>
-                          {getPaymentStateText(payment.state)}
+                        <Badge variant={getPaymentStateVariant(payment.status)}>
+                          {getPaymentStateText(payment.status)}
                         </Badge>
                       </TableCell>
                       <TableCell>{payment.reference || "-"}</TableCell>
@@ -694,6 +722,11 @@ export default function ClientDetailPage() {
 
         <TabsContent value="location" className="border rounded-md p-6">
           <h3 className="text-xl font-semibold mb-2">Ubicación</h3>
+          <p className="text-muted-foreground">Esta funcionalidad estará disponible próximamente.</p>
+        </TabsContent>
+
+        <TabsContent value="equipment" className="border rounded-md p-6">
+          <h3 className="text-xl font-semibold mb-2">Equipos</h3>
           <p className="text-muted-foreground">Esta funcionalidad estará disponible próximamente.</p>
         </TabsContent>
       </Tabs>
@@ -793,18 +826,20 @@ export default function ClientDetailPage() {
               style={{ cursor: isPanning ? 'grab' : 'default' }}
             >
               <div
-                className="relative bg-white rounded-lg shadow-lg overflow-hidden w-full h-full max-h-[calc(90vh-120px)]"
+                className="relative rounded-lg overflow-hidden w-full"
                 style={{
+                  height: "100%",
+                  // maxHeight: "calc(90vh - 120px)",
                   transform: `translate(${dragPosition.x}px, ${dragPosition.y}px) scale(${imageZoom}) rotate(${imageRotation}deg)`,
                   transition: isDragging ? 'none' : 'transform 0.2s ease-in-out'
                 }}
               >
                 <div className="relative w-full h-full">
                   <ClientImageFill
-                    imagePath={client?.referenceImage}
+                    imagePath={mainInstallation?.referenceImage}
                     alt="Imagen de Referencia del Cliente"
-                    className="w-full h-full"
-                    fallbackText={client?.referenceImage instanceof File ? 'Archivo seleccionado' : 'Sin imagen'}
+                    className="w-full h-full object-contain"
+                    fallbackText={typeof mainInstallation?.referenceImage === 'string' && mainInstallation?.referenceImage ? '' : 'Sin imagen'}
                     sizes="(max-width: 1200px) 100vw, 1200px"
                   />
                 </div>

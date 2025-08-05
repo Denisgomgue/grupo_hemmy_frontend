@@ -36,12 +36,16 @@ export function PaginatedCards<T>({
 
     return (
         <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch gap-4 mt-5">
                 {isLoading
                     ? Array.from({ length: pageSize }).map((_, i) => (
-                        <div key={i} className="h-64 rounded-lg bg-muted animate-pulse" />
+                        <div key={i} className="h-64 rounded-lg bg-muted animate-pulse min-h-[340px]" />
                     ))
-                    : data.map(renderCard)}
+                    : data.map((item) => (
+                        <div key={(item as any).id} className="h-full min-h-[340px] flex flex-col">
+                            {renderCard(item)}
+                        </div>
+                    ))}
             </div>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mt-4 p-2 border-t">
                 <div className="flex items-center gap-2">
@@ -57,7 +61,7 @@ export function PaginatedCards<T>({
                         ))}
                     </select>
                 </div>
-                <div className="flex items-center gap-2 justify-center">
+                <div className="flex items-center gap-2 justify-center ">
                     <Button
                         variant="ghost"
                         size="icon"

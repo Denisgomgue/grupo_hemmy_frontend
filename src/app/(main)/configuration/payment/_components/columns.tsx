@@ -6,11 +6,10 @@ import type { ColumnDef } from "@tanstack/react-table"
 import type { Payment, PaymentType } from "@/types/payments/payment"
 import { PaymentStatusBadge } from "@/components/payment/payment-status-badge"
 import { PaymentMethodIcon } from "@/components/payment/payment-method-icon"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ExternalLink } from "lucide-react"
 
-export const baseColumns: ColumnDef<Payment>[] = [
+// Función para crear las columnas con el onClick handler
+export const createBaseColumns = (onPaymentClick: (payment: Payment) => void): ColumnDef<Payment>[] => [
   {
     accessorKey: "client",
     header: "Cliente",
@@ -20,24 +19,17 @@ export const baseColumns: ColumnDef<Payment>[] = [
         return <div className="text-muted-foreground">Cliente no disponible</div>
       }
       return (
-        <Button
-          variant="ghost"
-          className="p-0 h-auto hover:bg-transparent"
-          asChild
-        >
-          <Link
-            href={`/configuration/client/${client.id}`}
-            className="flex items-start text-left hover:text-purple-800"
+        <div className="flex items-center justify-between gap-2 row">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-0 h-auto hover:bg-transparent hover:text-purple-600 font-medium text-left underline decoration-dotted underline-offset-4"
+            onClick={() => onPaymentClick(row.original)}
           >
-            <div>
-              <div className="font-medium flex items-center justify-between w-full gap-2">
-                {client.name} {client.lastName}
-                <ExternalLink className="h-3 w-3 opacity-50" />
-              </div>
-              <div className="text-sm text-muted-foreground">{client.dni}</div>
-            </div>
-          </Link>
-        </Button>
+            {client.name} {client.lastName}
+          </Button>
+          <PaymentStatusBadge status={row.original.status} />
+        </div>
       )
     },
   },
@@ -58,6 +50,16 @@ export const baseColumns: ColumnDef<Payment>[] = [
     header: "Fecha Pago",
     cell: ({ row }) => {
       const date = row.getValue("paymentDate") as string
+      if (!date) return <div className="text-muted-foreground">No pagado</div>
+      return <div>{format(new Date(date), "dd/MM/yyyy", { locale: es })}</div>
+    },
+  },
+  {
+    accessorKey: "dueDate",
+    header: "Fecha Vencimiento",
+    cell: ({ row }) => {
+      const date = row.getValue("dueDate") as string
+      if (!date) return <div className="text-muted-foreground">No definida</div>
       return <div>{format(new Date(date), "dd/MM/yyyy", { locale: es })}</div>
     },
   },
@@ -66,11 +68,13 @@ export const baseColumns: ColumnDef<Payment>[] = [
     header: "Método",
     cell: ({ row }) => {
       const paymentType = row.getValue("paymentType") as string
+      if (!paymentType) return <div className="text-muted-foreground">No definido</div>
       const methodLabels: Record<string, string> = {
         TRANSFER: "Transferencia",
         CASH: "Efectivo",
         YAPE: "Yape",
         PLIN: "Plin",
+        OTHER: "Otro",
       }
       return (
         <div className="flex items-center gap-2">
@@ -79,11 +83,6 @@ export const baseColumns: ColumnDef<Payment>[] = [
         </div>
       )
     },
-  },
-  {
-    accessorKey: "status",
-    header: "Estado",
-    cell: ({ row }) => <PaymentStatusBadge status={row.original.state} />,
   },
   {
     accessorKey: "reference",
@@ -100,4 +99,22 @@ export const baseColumns: ColumnDef<Payment>[] = [
       )
     },
   },
+  {
+    accessorKey: "reconnection",
+    header: "Reconexión",
+    cell: ({ row }) => {
+      const reconnection = row.getValue("reconnection") as boolean
+      return (
+        <div className={`px-2 py-1 rounded-full text-xs font-medium w-md text-center ${reconnection
+          ? "bg-orange-100 text-orange-800"
+          : "bg-gray-100 text-gray-800"
+          }`}>
+          {reconnection ? "Sí" : "No"}
+        </div>
+      )
+    },
+  },
 ]
+
+// Mantener la exportación original para compatibilidad
+export const baseColumns = createBaseColumns(() => { })

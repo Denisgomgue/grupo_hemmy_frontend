@@ -10,9 +10,9 @@ const notifyListeners = () => {
 }
 
 export function useSectors() {
-    const [sectors, setSectors] = useState<Sector[]>(sectorList)
+    const [ sectors, setSectors ] = useState<Sector[]>(sectorList)
 
-    const refreshSector = useCallback(async (page: number = 1, pageSize: number = 10) => {
+    const refreshSector = useCallback(async (page: number = 1, pageSize: number = 1000) => {
         try {
             const response = await api.get<Sector[]>("/sectors", {
                 params: {
@@ -20,7 +20,7 @@ export function useSectors() {
                     pageSize
                 }
             })
-            sectorList = response.data 
+            sectorList = response.data
             notifyListeners()
             return { data: sectorList, total: sectorList.length }
         } catch (error) {
@@ -30,13 +30,18 @@ export function useSectors() {
     }, [])
 
     useEffect(() => {
-        const listener = () => setSectors([...sectorList])
+        const listener = () => setSectors([ ...sectorList ])
         listeners.push(listener)
+
+        // Cargar sectores automáticamente si no hay sectores cargados
+        if (sectorList.length === 0) {
+            refreshSector()
+        }
 
         return () => {
             listeners = listeners.filter((l) => l !== listener)
         }
-    }, [])
+    }, [ refreshSector ])
 
     return { sectors, refreshSector }
 }

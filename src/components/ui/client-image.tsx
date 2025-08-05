@@ -81,7 +81,7 @@ export function ClientImageFill({
     fallbackClassName = "",
     showFallbackIcon = true,
     fallbackText = "Sin imagen",
-    sizes = "100px"
+    sizes = "250px"
 }: Omit<ClientImageProps, 'width' | 'height'> & { sizes?: string }) {
     const [ imageError, setImageError ] = useState(false);
 
@@ -108,7 +108,7 @@ export function ClientImageFill({
                 src={getImageUrl(imagePath)}
                 alt={alt}
                 fill
-                className="object-cover"
+                className="object-contain"
                 sizes={sizes}
                 onError={() => setImageError(true)}
             />

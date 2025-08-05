@@ -1,4 +1,4 @@
-import { PaymentStatus } from "@/types/clients/client"
+import { PaymentStatus } from "@/types/client-payment-configs/client-payment-config"
 
 export const clientPaymentStatusLabels: Record<PaymentStatus, string> = {
     [ PaymentStatus.PAID ]: "Pagado",

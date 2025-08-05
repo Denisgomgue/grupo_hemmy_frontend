@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Send, UsersRound, Home, PhoneOutgoing, FileUser, Users, House, ChevronLeft, ChevronRight, X, Globe, Building2, MapPinHouse, UserRoundSearch, MailSearch, UserPen, Store, BookUser, LaptopMinimalCheck, ReceiptText, FileDiff, ArrowRightLeft, Luggage, BaggageClaim, HandCoins, Receipt, CircleDollarSign, SearchCheck, BookOpen, CreditCard, Wallet, Briefcase, PieChart, FileText, RefreshCcw, Wifi, ClipboardList, User } from "lucide-react"
+import { Send, UsersRound, Home, PhoneOutgoing, FileUser, Users, House, ChevronLeft, ChevronRight, X, Globe, Building2, MapPinHouse, UserRoundSearch, MailSearch, UserPen, Store, BookUser, LaptopMinimalCheck, ReceiptText, FileDiff, ArrowRightLeft, Luggage, BaggageClaim, HandCoins, Receipt, CircleDollarSign, SearchCheck, BookOpen, CreditCard, Wallet, Briefcase, PieChart, FileText, RefreshCcw, Wifi, ClipboardList, User, Cpu, List, ShieldCheck, Shield, UserRound, UserCog, TrendingUp } from "lucide-react"
 import { GrUserSettings } from "react-icons/gr"
 import { ImProfile } from "react-icons/im"
 import Can from "../permission/can"
@@ -34,7 +34,7 @@ export function Sidebar({
   onToggleCollapse,
   isMobile,
 }: SidebarProps) {
-  const pathname = usePathname()
+  const pathname = usePathname() || ''
   const { user, loading } = useAuth()
   const { layoutMode, sidebarColor, colorScheme } = useTheme()
   const isDetached = layoutMode === "detached"
@@ -46,13 +46,13 @@ export function Sidebar({
 
     switch (sidebarColor) {
       case "light":
-        return "bg-background text-gray-900 dark:bg-gray-900 dark:text-gray-100"
+        return "bg-background text-purple-900 dark:bg-purple-900 dark:text-purple-100"
       case "dark":
-        return "bg-gray-800 text-gray-100 dark:bg-gray-900 dark:text-gray-200"
+        return "bg-purple-800 text-purple-100 dark:bg-purple-900 dark:text-purple-200"
       case "hemmy":
         return "bg-[#5E3583] text-white"
       default:
-        return "bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100"
+        return "bg-purple-100 text-purple-900 dark:bg-purple-900 dark:text-purple-100"
     }
   }
 
@@ -72,6 +72,7 @@ export function Sidebar({
   const canViewCustomer = ability.can('read', 'Customer');
   const canViewInventory = ability.can('read', 'Inventory');
   const canViewEntity = ability.can('read', 'Entity');
+  const canViewPrediction = ability.can('read', 'Prediction');
 
   const hasAdminItems = [
     canViewConfiguration,
@@ -80,13 +81,15 @@ export function Sidebar({
     canViewEmployee,
     canViewCustomer,
     canViewInventory,
-    canViewEntity
+    canViewEntity,
+    canViewPrediction
   ].some(Boolean);
 
   const configPaths = [
     "/configuration/plans",
     "/configuration/services",
     "/configuration/sectors",
+
     // Agrega aquí más rutas hijas si las tienes
   ];
 
@@ -98,7 +101,7 @@ export function Sidebar({
 
   // Ejemplo para otros menús padres:
   const inventoryPaths = [
-    // "/inventory/items",
+    "/configuration/devices",
     // "/inventory/categories",
     // ...
   ];
@@ -106,6 +109,22 @@ export function Sidebar({
     // "/entity/list",
     // "/entity/details",
     // ...
+  ];
+
+  const predictionsPaths = [
+    "/predictions",
+    // "/predictions/details",
+    // ...
+  ];
+
+  const administrationPaths = [
+    // "/configuration/devices",
+    "/configuration/employees",
+    "/configuration/role",
+    "/configuration/administration/permissions",
+    "/configuration/companies",
+    "/configuration/user",
+    "/configuration/administration/resources"
   ];
 
   return (
@@ -181,7 +200,7 @@ export function Sidebar({
                 <h2 className="mb-2 px-2 text-xs font-bold tracking-tight uppercase">Administración</h2>
               )}
 
-              <Can action="read" subject="Customer">
+              <Can action="" subject="">
                 <SidebarMenuItem
                   key="administration"
                   icon={User}
@@ -189,7 +208,7 @@ export function Sidebar({
                   isCollapsed={isCollapsed}
                   isActive={clientPaths.includes(pathname)}
                 >
-                  <Can action="read" subject="Client">
+                  <Can action="" subject="">
                     <SidebarMenuItem
                       key="client"
                       href="/configuration/client"
@@ -199,7 +218,7 @@ export function Sidebar({
                       isActive={pathname === "/configuration/client"}
                     />
                   </Can>
-                  <Can action="read" subject="Payment">
+                  <Can action="" subject="">
                     <SidebarMenuItem
                       key="payments"
                       href="/configuration/payment"
@@ -211,6 +230,7 @@ export function Sidebar({
                   </Can>
                 </SidebarMenuItem>
               </Can>
+
               <Can action="read" subject="Configuration">
                 <SidebarMenuItem
                   key="configurartion"
@@ -249,6 +269,141 @@ export function Sidebar({
                       isActive={pathname === "/configuration/sectors"}
                     />
                   </Can>
+
+                </SidebarMenuItem>
+              </Can>
+
+              <Can action="read" subject="Administration">
+                <SidebarMenuItem
+                  key="administration"
+                  //icono de la administracion
+                  icon={FaCogs}
+                  title="Administración"
+                  isCollapsed={isCollapsed}
+                  isActive={pathname === "/configuration/administration"}
+                >
+
+                  <Can action="read" subject="Employee">
+                    <SidebarMenuItem
+                      key="employees"
+                      href="/configuration/employees"
+                      // varias personas
+                      icon={Users}
+                      title="Empleados"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/configuration/employees"}
+                    />
+                  </Can>
+                  <Can action="read" subject="Resource">
+                    <SidebarMenuItem
+                      key="resources"
+                      href="/configuration/administration/resources"
+                      icon={Globe}
+                      title="Recursos"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/configuration/administration/resources"}
+                    />
+                  </Can>
+                  {/* <Can action="read" subject="Role">
+                    <SidebarMenuItem
+                      key="role"
+                      href="/configuration/role"
+                      // icono de persona con su engranage
+                      icon={UserCog}
+                      title="Roles"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/configuration/role"}
+                    />
+                  </Can> */}
+                  <Can action="read" subject="Permission">
+                    <SidebarMenuItem
+                      key="permissions-granular"
+                      href="/configuration/administration/permissions"
+                      // icono de permisos granular
+                      icon={Shield}
+                      title="Permisos Granular"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/configuration/administration/permissions"}
+                    />
+                  </Can>
+                  {/* <Can action="read" subject="Permission">
+                    <SidebarMenuItem
+                      key="permissions"
+                      href="/configuration/permission"
+                      // icono de permisos
+                      icon={ShieldCheck}
+                      title="Permisos"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/configuration/permission"}
+                    />
+                  </Can> */}
+                  <Can action="read" subject="Company">
+                    <SidebarMenuItem
+                      key="companies"
+                      href="/configuration/companies"
+                      icon={Building2}
+                      title="Empresas"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/configuration/companies"}
+                    />
+                  </Can>
+                  <Can action="read" subject="User">
+                    <SidebarMenuItem
+                      key="user"
+                      href="/configuration/user"
+                      icon={User}
+                      title="Usuarios"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/configuration/user"}
+                    />
+                  </Can>
+                </SidebarMenuItem>
+                {/* Inventario */}
+                <SidebarMenuItem
+                  key="inventory"
+                  icon={Cpu}
+                  title="Inventario"
+                  isCollapsed={isCollapsed}
+                  isActive={inventoryPaths.includes(pathname)}
+                >
+                  <Can action="read" subject="Device">
+                    <SidebarMenuItem
+                      key="devices"
+                      href="/configuration/devices"
+                      icon={Cpu}
+                      title="Dispositivos"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/configuration/devices"}
+                    />
+                  </Can>
+                  <Can action="read" subject="CategoryProduct">
+                    <SidebarMenuItem
+                      key="categoriesProducts"
+                      href="/configuration/categoriesProducts"
+                      icon={List}
+                      title="Categorías"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/configuration/categoriesProducts"}
+                    />
+                  </Can>
+                </SidebarMenuItem>
+                <SidebarMenuItem
+                  key="predictions"
+                  icon={TrendingUp}
+                  title="Predicciones"
+                  isCollapsed={isCollapsed}
+                  isActive={predictionsPaths.includes(pathname)}
+                >
+                  <Can action="read" subject="Prediction">
+                    <SidebarMenuItem
+                      key="predictions"
+                      href="/predictions"
+                      icon={TrendingUp}
+                      title="Predicciones"
+                      isCollapsed={isCollapsed}
+                      isActive={pathname === "/predictions"}
+                    />
+                  </Can>
                 </SidebarMenuItem>
               </Can>
             </div>
@@ -258,5 +413,4 @@ export function Sidebar({
     </div >
   )
 }
-console.log("Sidebar")
 export default Sidebar;

@@ -1,5 +1,8 @@
+import { Payment } from "../payments/payment";
+import { Installation } from "../installations/installation";
+import { Device } from "../devices/device";
 import { Plan } from "../plans/plan";
-import { Sector } from "../sectors/sector"
+import { Sector } from "../sectors/sector";
 
 export enum AccountStatus {
     ACTIVE = 'ACTIVE',
@@ -9,30 +12,43 @@ export enum AccountStatus {
 
 export enum PaymentStatus {
     SUSPENDED = 'SUSPENDED',
-    EXPIRING = 'EXPIRING',
     EXPIRED = 'EXPIRED',
+    EXPIRING = 'EXPIRING',
     PAID = 'PAID'
 }
 
 export interface Client {
     id: number;
-    name: string;
-    lastName: string;
+    name?: string;
+    lastName?: string;
     dni: string;
-    phone: string;
-    address: string;
+    phone?: string;
+    address?: string;
+    description?: string;
+    birthdate?: Date;
+    status: AccountStatus;
+    
+    // Campos de instalación (para formulario unificado)
     installationDate?: string;
     reference?: string;
-    referenceImage?: string | File | null;
-    initialPaymentDate?: string;
-    paymentDate?: string;
-    advancePayment?: boolean;
-    description?: string;
-    routerSerial?: string;
-    decoSerial?: string;
     ipAddress?: string;
-    paymentStatus: PaymentStatus;
-    status: AccountStatus;
+    referenceImage?: string;
     plan?: Plan;
     sector?: Sector;
+    
+    // Campos de pago (para formulario unificado)
+    paymentDate?: string;
+    advancePayment?: boolean;
+    paymentStatus?: PaymentStatus;
+    
+    // Campos de dispositivos (para formulario unificado)
+    routerSerial?: string;
+    decoSerial?: string;
+    
+    // Relaciones
+    payments?: Payment[];
+    installations?: Installation[];
+    devices?: Device[];
+    created_at: Date;
+    updated_at: Date;
 }

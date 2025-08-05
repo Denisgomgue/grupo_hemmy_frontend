@@ -1,0 +1,9 @@
+export { PermissionsPage } from './permissions-page';
+export { PermissionsSummaryCards } from './permissions-summary-cards';
+export { PermissionsMatrix } from './permissions-matrix';
+export { ModuleNavigation } from './module-navigation';
+export { BasePermissionsTable } from './base-permissions-table';
+export { SpecificPermissionsTable } from './specific-permissions-table';
+export { EditRoleModal } from './edit-role-modal';
+export { DeleteRoleModal } from './delete-role-modal';
+export { AddRoleModal } from './add-role-modal'; 

@@ -18,21 +18,22 @@ export function InfoCardShell({
 }: InfoCardShellProps) {
     return (
         <div className={cn(
-            "p-4 border rounded-lg shadow-sm mb-4 bg-card text-card-foreground", // Estilos base
+            "p-6 border rounded-lg shadow-sm bg-card text-card-foreground flex flex-col h-full justify-between", // Estilos base y alineación
             className // Clases personalizadas
         )}>
             {/* Renderizar Sección Superior */}
             {topSection}
 
             {/* Renderizar Sección Media */}
-            {middleSection}
-
-            {/* Renderizar Sección Inferior (si existe) con divisor */}
-            {bottomSection && (
-                <div className="border-t pt-3 mt-4"> {/* Añadido mt-4 para separar del medio */}
-                    {bottomSection}
-                </div>
-            )}
+            <div className="flex-1 flex flex-col justify-between">
+                {middleSection}
+                {/* Renderizar Sección Inferior (si existe) con divisor */}
+                {bottomSection && (
+                    <div className="border-t pt-3 mt-4"> {/* Añadido mt-4 para separar del medio */}
+                        {bottomSection}
+                    </div>
+                )}
+            </div>
         </div>
     );
 } 

@@ -1,133 +1,233 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { GeneralTable } from "@/components/dataTable/table";
-import { Permission } from "@/types/permissions/permission";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { FormPermission } from "./_components/form-permission";
-import { columns } from "./_components/columns";
-import { FaPlus } from "react-icons/fa";
-import { usePermissions } from "@/hooks/usePermission";
-import api from "@/lib/axios";
-import Can from "@/components/permission/can";
+import { MainContainer } from "@/components/layout/main-container";
+import { HeaderActions } from "@/components/layout/header-actions";
+import { ReloadButton } from "@/components/layout/reload-button";
+import { Save, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
-import { headers } from "./_components/headers";
-import { ActionsCell } from "./_components/actions-cell";
-import { ResponsiveTable } from "@/components/dataTable/responsive-table";
+import { usePermissionsAPI } from "@/hooks/use-permissions-api";
+import { useResourcesAPI } from "@/hooks/use-resources-api";
+import { PermissionsMatrix } from "./_components/permissions-matrix";
+import { EditRoleModal } from "./_components/edit-role-modal";
+import { DeleteRoleModal } from "./_components/delete-role-modal";
+import { AddRoleModal } from "./_components/add-role-modal";
+import { PermissionsSummaryCards } from "./_components/permissions-summary-cards";
 
-const PermisosPage: React.FC = () => {
-    const { permissions, refreshPermissions } = usePermissions();
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [currentPermission, setCurrentPermission] = useState<Permission | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1)
-    const [pageSize, setPageSize] = useState(10)
+export default function Page() {
+    const [ selectedModule, setSelectedModule ] = useState('payments');
+    const [ hasChanges, setHasChanges ] = useState(false);
+    const [ isSaving, setIsSaving ] = useState(false);
 
-    const paginatedData = useMemo(() => {
-        const start = (currentPage - 1) * pageSize
-        const end = start + pageSize
-        return permissions.slice(start, end)
-    }, [permissions, currentPage, pageSize])
+    // Estados para modales
+    const [ editRoleModal, setEditRoleModal ] = useState<{ isOpen: boolean; role: any }>({ isOpen: false, role: null });
+    const [ deleteRoleModal, setDeleteRoleModal ] = useState<{ isOpen: boolean; role: any }>({ isOpen: false, role: null });
+    const [ addRoleModal, setAddRoleModal ] = useState<{ isOpen: boolean }>({ isOpen: false });
 
-    const handlePaginationChange = (page: number, newPageSize: number) => {
-        setCurrentPage(page)
-        if (newPageSize !== pageSize) {
-            setPageSize(newPageSize)
-            setCurrentPage(1)
-        }
-    }
+    // Usar el hook de la API de permisos
+    const {
+        roles,
+        modules,
+        permissionMatrix: apiPermissionMatrix,
+        permissionsByResource,
+        isLoadingRoles,
+        isLoadingModules,
+        isLoadingMatrix,
+        isLoadingResourcePermissions,
+        updateMatrixPermission,
+        getMatrixPermissionStatus,
+        updatePermissionMatrix,
+        loadPermissionsByResource,
+        hasChanges: apiHasChanges,
+        isSaving: apiIsSaving,
+        setHasChanges: setApiHasChanges,
+        // Lógica de allowAll
+        isRoleAllowAll,
+        isRoleEditable,
+        isRoleDeletable,
+        getMatrixPermissionStatusWithAllowAll,
+        updateMatrixPermissionWithAllowAll,
+        // Funciones de módulos
+        createModule,
+        loadAllData
+    } = usePermissionsAPI();
 
-    const fetchPermissions = async () => {
-        setIsLoading(true);
-        try {
-            await refreshPermissions();
-        } catch (error) {
-            console.error("Error fetching permissions:", error);
-            toast.error("Error al cargar los permisos");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // Usar el hook de la API de recursos
+    const { resources, isLoading: isLoadingResources } = useResourcesAPI();
 
+    // Establecer el primer recurso como seleccionado cuando se cargan los recursos
     useEffect(() => {
-        fetchPermissions();
-    }, [refreshPermissions]);
+        if (resources.length > 0 && !resources.find(r => r.routeCode === selectedModule)) {
+            const firstActiveResource = resources.find(r => r.isActive);
+            if (firstActiveResource) {
+                setSelectedModule(firstActiveResource.routeCode);
+            }
+        }
+    }, [ resources, selectedModule ]);
 
-    const createPermission = async (newPermission: Permission) => {
-        setLoading(true)
+    // Cargar permisos del recurso seleccionado
+    useEffect(() => {
+        if (selectedModule && resources.length > 0) {
+            loadPermissionsByResource(selectedModule);
+        }
+    }, [ selectedModule, resources, loadPermissionsByResource ]);
+
+    const handleReload = () => {
+        loadAllData();
+    };
+
+    const handleSaveChanges = async () => {
+        setIsSaving(true);
         try {
-            await api.post<Permission>("/permissions", newPermission);
-            toast.success("Se creo el permiso correctamente");
-            await refreshPermissions();
+            await updatePermissionMatrix(apiPermissionMatrix);
+            toast.success('Permisos guardados correctamente');
+            setHasChanges(false);
         } catch (error) {
-            toast.error("Error al crear el permiso");
-            console.error("Error creating permission:", error);
+            toast.error('Error al guardar permisos');
         } finally {
-            setLoading(false)
+            setIsSaving(false);
         }
     };
 
-    const handleSave = (permission: Permission) => {
-        createPermission(permission);
-        setDialogOpen(false);
-        setCurrentPermission(null);
+    const handleResetChanges = () => {
+        setHasChanges(false);
+        toast.info('Cambios restablecidos');
     };
+
+    const handleChangesDetected = (hasChanges: boolean) => {
+        setHasChanges(hasChanges);
+    };
+
+    const handlePermissionChange = (roleName: string, module: string, permission: string, granted: boolean) => {
+        updateMatrixPermissionWithAllowAll(roleName, module, permission, granted);
+    };
+
+    const getPermissionStatus = (roleName: string, module: string, permission: string) => {
+        return getMatrixPermissionStatusWithAllowAll(roleName, module, permission);
+    };
+
+    // Funciones para acciones de roles
+    const handleAddRole = () => {
+        setAddRoleModal({ isOpen: true });
+    };
+
+    const handleEditRole = (roleName: string) => {
+        if (isRoleAllowAll(roleName)) {
+            toast.warning('No se puede editar el Super Administrador');
+            return;
+        }
+        const role = roles.find(r => r.name === roleName);
+        if (role) {
+            setEditRoleModal({ isOpen: true, role });
+        }
+    };
+
+    const handleDeleteRole = (roleName: string) => {
+        if (isRoleAllowAll(roleName)) {
+            toast.warning('No se puede eliminar el Super Administrador');
+            return;
+        }
+        const role = roles.find(r => r.name === roleName);
+        if (role) {
+            setDeleteRoleModal({ isOpen: true, role });
+        }
+    };
+
+    const handleAddBasePermission = () => {
+        toast.info('Función de agregar permiso base en desarrollo');
+    };
+
+    const handleAddSpecificPermission = () => {
+        toast.info('Función de agregar permiso específico en desarrollo');
+    };
+
+    // Estado de carga combinado
+    const isLoading = isLoadingRoles || isLoadingModules || isLoadingMatrix || isLoadingResources || isLoadingResourcePermissions;
+
+    // Calcular estadísticas para las tarjetas de resumen
+    const permissionsSummary = {
+        totalRoles: roles.length,
+        totalResources: resources.length,
+        activeRoles: roles.filter(r => !isRoleAllowAll(r.name)).length,
+        inactiveRoles: 0 // Por ahora 0, se puede ajustar según la lógica de negocio
+    };
+
+    // Obtener permisos del recurso seleccionado
+    const selectedResourcePermissions = permissionsByResource[ selectedModule ] || [];
 
     return (
-        <Can action="ver-permiso" subject="configuracion-permiso" redirectOnFail={true}>
-            <div className="container mx-auto bg-white dark:bg-slate-900 p-4 rounded-md border">
-                <div className="flex flex-col md:flex-row justify-between items-center space-y-4">
-                    <h2 className="text-xl font-bold">Permisos del sistema</h2>
-                    <div className="flex md:flex-row flex-col justify-between items-center gap-2">
-                        <Can action="crear-permiso" subject="configuracion-permiso">
-                            <Button variant="default" onClick={() => setDialogOpen(true)}>
-                                <FaPlus /> Agregar Permiso
-                            </Button>
-                        </Can>
-                        <Button
-                            variant="outline"
-                            onClick={() => fetchPermissions()}
-                            disabled={isLoading}
-                        >
-                            {isLoading ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <RefreshCw className="h-4 w-4" />
-                            )}
-                            Recargar Datos
-                        </Button>
-                    </div>
-                </div>
-                <ResponsiveTable
-                    columns={columns}
-                    headers={headers}
-                    data={paginatedData}
-                    isLoading={isLoading}
-                    pagination={{
-                        totalRecords: permissions.length,
-                        pageSize: pageSize,
-                        onPaginationChange: handlePaginationChange,
-                        currentPage: currentPage
-                    }}
-                    actions={(row: Permission) => <ActionsCell rowData={row} />}
-                />
-                {dialogOpen && (
-                    <FormPermission
-                        open={dialogOpen}
-                        permissionEdited={currentPermission}
-                        onSave={handleSave}
-                        onClose={() => {
-                            setDialogOpen(false);
-                            setCurrentPermission(null);
-                        }}
-                        loading={loading}
+        <MainContainer>
+            <HeaderActions title="Gestión de Permisos Granular">
+                <div className="flex items-center gap-4">
+                    <ReloadButton
+                        onClick={handleReload}
+                        isLoading={isLoading}
                     />
-                )}
-            </div>
-        </Can>
-    );
-};
+                    <Button
+                        variant="outline"
+                        onClick={handleResetChanges}
+                        disabled={!hasChanges}
+                    >
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Restablecer
+                    </Button>
 
-export default PermisosPage;
+                    <Button
+                        onClick={handleSaveChanges}
+                        disabled={!hasChanges || isSaving}
+                    >
+                        <Save className="h-4 w-4 mr-2" />
+                        {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+                    </Button>
+                </div>
+            </HeaderActions>
+
+            {/* Summary Cards */}
+            <PermissionsSummaryCards
+                summary={permissionsSummary}
+                isLoading={isLoading}
+            />
+
+            {/* Permissions Matrix */}
+            <PermissionsMatrix
+                roles={roles}
+                modules={resources} // Cambiar modules por resources
+                selectedModule={selectedModule}
+                onModuleChange={setSelectedModule}
+                getPermissionStatus={getPermissionStatus}
+                handlePermissionChange={handlePermissionChange}
+                isRoleAllowAll={isRoleAllowAll}
+                onAddRole={handleAddRole}
+                onEditRole={handleEditRole}
+                onDeleteRole={handleDeleteRole}
+                onAddBasePermission={handleAddBasePermission}
+                onAddSpecificPermission={handleAddSpecificPermission}
+                isLoading={isLoading}
+                resourcePermissions={selectedResourcePermissions}
+            />
+
+            {/* Modales */}
+            <EditRoleModal
+                isOpen={editRoleModal.isOpen}
+                onClose={() => setEditRoleModal({ isOpen: false, role: null })}
+                role={editRoleModal.role}
+            />
+
+            <DeleteRoleModal
+                isOpen={deleteRoleModal.isOpen}
+                onClose={() => setDeleteRoleModal({ isOpen: false, role: null })}
+                role={deleteRoleModal.role}
+            />
+
+            <AddRoleModal
+                isOpen={addRoleModal.isOpen}
+                onClose={() => setAddRoleModal({ isOpen: false })}
+                onRoleCreated={(newRole) => {
+                    // El modal ya recarga los roles automáticamente
+                    console.log('Nuevo rol creado:', newRole);
+                }}
+            />
+        </MainContainer>
+    );
+} 

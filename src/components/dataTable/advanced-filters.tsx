@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button"
+import { ResponsiveButton } from "@/components/ui/responsive-button"
 import {
     Sheet,
     SheetContent,
@@ -136,10 +137,10 @@ export function AdvancedFilters({ groups, onFiltersChange, initialFilters = {} }
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center gap-2">
+                <ResponsiveButton variant="outline" size="sm" className="flex items-center gap-2">
                     <Filter className="h-4 w-4" />
                     Filtros Avanzados
-                </Button>
+                </ResponsiveButton>
             </SheetTrigger>
             <SheetContent className="w-[400px] sm:w-[540px]">
                 <SheetHeader>
