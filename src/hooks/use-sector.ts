@@ -30,18 +30,18 @@ export function useSectors() {
     }, [])
 
     useEffect(() => {
-        const listener = () => setSectors([ ...sectorList ])
-        listeners.push(listener)
+        const listener = () => setSectors([ ...sectorList ]);
+        listeners.push(listener);
 
         // Cargar sectores automáticamente si no hay sectores cargados
         if (sectorList.length === 0) {
-            refreshSector()
+            refreshSector();
         }
 
         return () => {
-            listeners = listeners.filter((l) => l !== listener)
-        }
-    }, [ refreshSector ])
+            listeners = listeners.filter((l) => l !== listener);
+        };
+    }, []); // Remover dependencias que causan re-renders
 
     return { sectors, refreshSector }
 }

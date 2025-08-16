@@ -77,34 +77,34 @@ export function useClientPaymentConfigs() {
     const createConfig = useCallback(async (configData: any): Promise<ClientPaymentConfig> => {
         try {
             const response = await api.post<ClientPaymentConfig>("/client-payment-configs", configData);
-            await fetchConfigs();
+            // No llamar fetchConfigs aquí para evitar re-renders
             return mapClientPaymentConfigFromApi(response.data);
         } catch (error) {
             console.error("Error creating client payment config:", error);
             throw error;
         }
-    }, [ fetchConfigs ]);
+    }, []);
 
     const updateConfig = useCallback(async (id: number, configData: any): Promise<ClientPaymentConfig> => {
         try {
             const response = await api.patch<ClientPaymentConfig>(`/client-payment-configs/${id}`, configData);
-            await fetchConfigs();
+            // No llamar fetchConfigs aquí para evitar re-renders
             return mapClientPaymentConfigFromApi(response.data);
         } catch (error) {
             console.error("Error updating client payment config:", error);
             throw error;
         }
-    }, [ fetchConfigs ]);
+    }, []);
 
     const deleteConfig = useCallback(async (id: number): Promise<void> => {
         try {
             await api.delete(`/client-payment-configs/${id}`);
-            await fetchConfigs();
+            // No llamar fetchConfigs aquí para evitar re-renders
         } catch (error) {
             console.error("Error deleting client payment config:", error);
             throw error;
         }
-    }, [ fetchConfigs ]);
+    }, []);
 
     const getConfigByInstallation = useCallback(async (installationId: number): Promise<ClientPaymentConfig | null> => {
         try {
@@ -119,13 +119,13 @@ export function useClientPaymentConfigs() {
     const updatePaymentStatus = useCallback(async (id: number, status: PaymentStatus): Promise<ClientPaymentConfig> => {
         try {
             const response = await api.patch<ClientPaymentConfig>(`/client-payment-configs/${id}/status`, { status });
-            await fetchConfigs();
+            // No llamar fetchConfigs aquí para evitar re-renders
             return mapClientPaymentConfigFromApi(response.data);
         } catch (error) {
             console.error("Error updating payment status:", error);
             throw error;
         }
-    }, [ fetchConfigs ]);
+    }, []);
 
     return {
         configs,

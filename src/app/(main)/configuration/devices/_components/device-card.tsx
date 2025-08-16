@@ -5,11 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
-import { Cpu, Wifi, Settings, WifiOff, AlertTriangle, MapPin, Calendar } from "lucide-react";
+import { Cpu, Wifi, Settings, WifiOff, AlertTriangle, MapPin, Calendar, Clock } from "lucide-react";
 import { DeviceActionsDropdown } from "./device-actions-dropdown";
-import { InfoCardShell } from "./info-card-shell";
-import { Card, CardContent } from "@/components/ui/card";
-import Link from "next/link";
+import { EquipmentModal } from "./equipment-modal";
+import { useState } from "react";
 
 // --- Helpers ---
 
@@ -106,59 +105,58 @@ interface DeviceCardProps {
 export function DeviceCard({ device, onEdit, onDelete }: DeviceCardProps) {
     if (!device) return null;
 
-    const initial = device.serialNumber ? device.serialNumber[ 0 ].toUpperCase() : "?";
+    const [ isModalOpen, setIsModalOpen ] = useState(false);
     const avatarColor = getAvatarColor(device.serialNumber || "");
 
     const topSectionContent = (
-        <div className="flex items-center justify-between mb-4">
-            <Link
-                href={`/configuration/devices/${device.id}`}
-                className="flex-1 hover:bg-purple-100 rounded-lg transition-colors p-2 -m-2"
+        <div className="flex items-center justify-around mb-4 gap-4 flex-wrap">
+            <button
+                onClick={() => setIsModalOpen(true)}
+                className="flex-1 hover:bg-purple-50 rounded-lg transition-colors p-2 -m-2 border-b-2 border-b-purple-50 cursor-pointer"
             >
-                <div className="flex items-center gap-3">
-                    <Avatar className={`h-9 w-9 text-sm ${avatarColor} text-black`}>
-                        <AvatarFallback>{initial}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                        <div className="font-semibold">{device.serialNumber}</div>
-                        <div className="text-xs text-muted-foreground">
-                            {getTypeIcon(device.type)} {getTypeLabel(device.type)}
-                        </div>
+                <div className="flex gap-3 items-center flex-wrap w-full justify-between">
+                    <div className="flex items-center justify-between gap-2">
+                        <Avatar className={`h-7 w-8 text-sm ${avatarColor} text-black`}>
+                            <AvatarFallback>{getTypeIcon(device.type)}</AvatarFallback>
+                        </Avatar>
+                        <div className="font-semibold">{getTypeLabel(device.type)}</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        {getStatusBadge(device.status)}
                     </div>
                 </div>
-            </Link>
+            </button>
             <DeviceActionsDropdown device={device} onEdit={onEdit} onDelete={onDelete} />
         </div>
     );
 
     const middleSectionContent = (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mb-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+
             <div>
-                <div className="text-xs text-muted-foreground mb-0.5">Estado</div>
-                <div className="flex items-center gap-1.5">
-                    {getStatusBadge(device.status)}
-                </div>
+                <div className="text-xs text-muted-foreground mb-1">Marca</div>
+                <div className="font-medium">{device.brand || '-'}</div>
+
             </div>
             <div>
-                <div className="text-xs text-muted-foreground mb-0.5">Marca / Modelo</div>
-                <div className="font-medium">{device.brand || 'N/A'}</div>
-                <div className="text-xs text-muted-foreground">{device.model || 'N/A'}</div>
+                <div className="text-xs text-muted-foreground mb-1">Modelo</div>
+                <div className="font-medium">{device.model || '-'}</div>
             </div>
             <div>
-                <div className="text-xs text-muted-foreground mb-0.5">Instalación</div>
+                <div className="text-xs text-muted-foreground mb-1">Instalación</div>
                 <div className="flex items-center gap-1.5 font-medium">
                     <MapPin className="h-3 w-3" />
-                    <span>{device.assignedInstallationId ? 'Asignada' : 'N/A'}</span>
+                    <span>{device.assignedInstallationId ? 'Asignada' : 'No Asignada'}</span>
                 </div>
             </div>
             <div>
-                <div className="text-xs text-muted-foreground mb-0.5">Fecha Asignación</div>
+                <div className="text-xs text-muted-foreground mb-1">Fecha Asignación</div>
                 <div className="flex items-center gap-1.5">
                     <Calendar className="h-3 w-3" />
                     <span className="text-xs">
                         {device.assignedDate
                             ? format(new Date(device.assignedDate), "dd/MM/yyyy", { locale: es })
-                            : 'N/A'
+                            : 'Aún no asignada'
                         }
                     </span>
                 </div>
@@ -169,23 +167,41 @@ export function DeviceCard({ device, onEdit, onDelete }: DeviceCardProps) {
     const bottomSectionContent = (
         <div className="grid grid-cols-2 gap-x-4 text-sm">
             <div>
-                <div className="text-xs text-muted-foreground mb-0.5">MAC Address</div>
-                <div className="font-medium">{device.macAddress || 'N/A'}</div>
+                <div className="text-xs text-muted-foreground mb-1">MAC Address</div>
+                <div className="font-medium">{device.macAddress || '00:00:00:00:00:00'}</div>
             </div>
             <div>
-                <div className="text-xs text-muted-foreground mb-0.5">Técnico</div>
-                <div className="font-medium">{device.assignedEmployeeId ? 'Asignado' : 'N/A'}</div>
+                <div className="text-xs text-muted-foreground mb-1">Número de Serie</div>
+                <div className="font-medium">{device.serialNumber || '-'}</div>
             </div>
         </div>
     );
 
     return (
-        <CardContent>
-            <InfoCardShell
-                topSection={topSectionContent}
-                middleSection={middleSectionContent}
-                bottomSection={bottomSectionContent}
+        <>
+            <div className="p-4 border rounded-lg shadow-sm bg-card text-card-foreground flex flex-col min-h-[280px]">
+                {/* Sección Superior */}
+                {topSectionContent}
+
+                {/* Sección Media */}
+                <div className="flex-1 flex flex-col justify-around">
+                    {middleSectionContent}
+
+                    {/* Sección Inferior con divisor */}
+                    {bottomSectionContent && (
+                        <div className="border-t pt-3 mt-3">
+                            {bottomSectionContent}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Modal de Equipo */}
+            <EquipmentModal
+                equipment={device}
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
             />
-        </CardContent>
+        </>
     );
 } 

@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { deviceSchema, type DeviceFormData } from "@/schemas/device-schema"
+import { deviceSchema, updateDeviceSchema, type DeviceFormData, type UpdateDeviceFormData } from "@/schemas/device-schema"
 import { Device, DeviceType, DeviceStatus, DeviceUseType, DEVICE_TYPES, DEVICE_STATUS, DEVICE_USE_TYPES } from "@/types/devices/device"
 import { useEffect, useCallback } from "react"
 
 interface DeviceFormProps {
     device?: Device | null
-    onSubmit: (values: DeviceFormData) => void
+    onSubmit: (values: DeviceFormData | Omit<DeviceFormData, 'serialNumber'>) => void
     isLoading?: boolean
     onCancel: () => void
     formRef?: React.RefObject<HTMLFormElement | null>
@@ -21,7 +21,7 @@ interface DeviceFormProps {
 
 export function DeviceForm({ device, onSubmit, isLoading = false, onCancel, formRef, onFormReady }: DeviceFormProps) {
     const form = useForm<DeviceFormData>({
-        resolver: zodResolver(deviceSchema),
+        resolver: zodResolver(device ? updateDeviceSchema : deviceSchema),
         defaultValues: {
             serialNumber: "",
             type: "router" as DeviceType,
@@ -35,7 +35,6 @@ export function DeviceForm({ device, onSubmit, isLoading = false, onCancel, form
             assignedEmployeeId: undefined,
             assignedClientId: undefined,
             ...(device ? {
-                serialNumber: device.serialNumber || "",
                 type: device.type || "router",
                 status: device.status || "STOCK",
                 useType: device.useType || "CLIENT",
@@ -52,8 +51,8 @@ export function DeviceForm({ device, onSubmit, isLoading = false, onCancel, form
 
     useEffect(() => {
         if (device) {
-            form.reset({
-                serialNumber: device.serialNumber || "",
+            const formValues = {
+                serialNumber: device.serialNumber || "", // Mantener para compatibilidad
                 type: device.type || "router",
                 status: device.status || "STOCK",
                 useType: device.useType || "CLIENT",
@@ -64,7 +63,9 @@ export function DeviceForm({ device, onSubmit, isLoading = false, onCancel, form
                 assignedInstallationId: device.assignedInstallationId,
                 assignedEmployeeId: device.assignedEmployeeId,
                 assignedClientId: device.assignedClientId,
-            })
+            };
+
+            form.reset(formValues);
         }
     }, [ device, form ])
 
@@ -75,7 +76,13 @@ export function DeviceForm({ device, onSubmit, isLoading = false, onCancel, form
     }, [ form, onFormReady ]);
 
     const handleSubmit = async (values: DeviceFormData) => {
-        await onSubmit(values)
+        // Si es edición, remover serialNumber antes de enviar
+        if (device) {
+            const { serialNumber, ...updateValues } = values;
+            await onSubmit(updateValues as any);
+        } else {
+            await onSubmit(values);
+        }
     }
 
     const getTypeLabel = (type: DeviceType) => {
@@ -119,7 +126,13 @@ export function DeviceForm({ device, onSubmit, isLoading = false, onCancel, form
 
     return (
         <Form {...form}>
-            <form ref={formRef} onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <form
+                ref={formRef}
+                onSubmit={(e) => {
+                    form.handleSubmit(handleSubmit)(e);
+                }}
+                className="space-y-6"
+            >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
                         control={form.control}
@@ -133,11 +146,13 @@ export function DeviceForm({ device, onSubmit, isLoading = false, onCancel, form
                                         onChange={field.onChange}
                                         onBlur={field.onBlur}
                                         name={field.name}
-                                        disabled={isLoading}
+                                        disabled={isLoading || !!device} // Deshabilitado si es edición
                                         placeholder="Ingrese el número de serie"
+                                        className={device ? "bg-gray-100 cursor-not-allowed" : ""}
                                     />
                                 </FormControl>
-                                <FormMessage />
+
+
                             </FormItem>
                         )}
                     />
@@ -199,6 +214,29 @@ export function DeviceForm({ device, onSubmit, isLoading = false, onCancel, form
                                     <SelectContent>
                                         {DEVICE_USE_TYPES.map((useType) => (
                                             <SelectItem key={useType} value={useType}>{getUseTypeLabel(useType)}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Estado *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value || ""} disabled={isLoading}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar estado" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {DEVICE_STATUS.map((status) => (
+                                            <SelectItem key={status} value={status}>{getStatusLabel(status)}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

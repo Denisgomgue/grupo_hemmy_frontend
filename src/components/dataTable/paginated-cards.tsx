@@ -39,10 +39,10 @@ export function PaginatedCards<T>({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch gap-4 mt-5">
                 {isLoading
                     ? Array.from({ length: pageSize }).map((_, i) => (
-                        <div key={i} className="h-64 rounded-lg bg-muted animate-pulse min-h-[340px]" />
+                        <div key={i} className="h-64 rounded-lg bg-muted animate-pulse " />
                     ))
                     : data.map((item) => (
-                        <div key={(item as any).id} className="h-full min-h-[340px] flex flex-col">
+                        <div key={(item as any).id} className="h-full flex flex-col">
                             {renderCard(item)}
                         </div>
                     ))}

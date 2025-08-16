@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { Device, DeviceStatus, DeviceType, DeviceUseType } from "@/types/devices/device"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Edit, Trash2, Cpu, User, ClipboardList, Calendar, UserCog } from "lucide-react"
+import { MoreHorizontal, Edit, Trash2, Eye, Cpu, User, ClipboardList, Calendar, UserCog, Clock } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -64,23 +64,20 @@ const getUseTypeLabel = (useType: DeviceUseType) => {
 
 export function getDeviceColumns(
     handleEditClick: (device: Device) => void,
-    handleDeleteClick: (deviceId: string) => void
+    handleDeleteClick: (deviceId: string) => void,
+    handleViewClick?: (device: Device) => void
 ): ColumnDef<Device>[] {
     return [
-        {
-            accessorKey: "serialNumber",
-            header: "Serial",
-            cell: ({ row }) => row.original.serialNumber || <span className="text-muted-foreground">-</span>,
-        },
+
         {
             accessorKey: "type",
             header: "Tipo",
             cell: ({ row }) => getTypeLabel(row.original.type),
         },
         {
-            accessorKey: "status",
-            header: "Estado",
-            cell: ({ row }) => getStatusBadge(row.original.status),
+            accessorKey: "serialNumber",
+            header: "Serial",
+            cell: ({ row }) => row.original.serialNumber || <span className="text-muted-foreground">-</span>,
         },
         {
             accessorKey: "useType",
@@ -97,11 +94,28 @@ export function getDeviceColumns(
             header: "Modelo",
             cell: ({ row }) => row.original.model || <span className="text-muted-foreground">-</span>,
         },
+
+        {
+            accessorKey: "status",
+            header: "Estado",
+            cell: ({ row }) => getStatusBadge(row.original.status),
+        },
         {
             id: "actions",
             header: "Acciones",
             cell: ({ row }) => (
                 <div className="flex items-center gap-2">
+                    {handleViewClick && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewClick(row.original)}
+                            className="h-8 w-8 p-0 hover:bg-green-100 hover:text-green-600"
+                        >
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">Ver</span>
+                        </Button>
+                    )}
                     <Button
                         variant="ghost"
                         size="sm"

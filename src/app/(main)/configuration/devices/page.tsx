@@ -15,6 +15,8 @@ import { AddButton } from "@/components/layout/add-button";
 import { ReloadButton } from "@/components/layout/reload-button";
 import { DeviceFormData } from "@/schemas/device-schema";
 import { getDeviceColumns } from "./_components/columns";
+import { OrderSelector } from "./_components/order-selector";
+import { EquipmentModal } from "./_components/equipment-modal";
 
 import { DeviceCard } from "./_components/device-card";
 import { ColumnDef } from '@tanstack/react-table';
@@ -28,6 +30,7 @@ import { Button } from "@/components/ui/button"
 import { AdvancedFilters } from "@/components/dataTable/advanced-filters"
 import { useSectors } from "@/hooks/use-sector"
 import { Sector } from "@/types/sectors/sector"
+import { useResponsiveDualView } from "@/hooks/use-responsive-view"
 
 interface DeviceSummary {
     total: number;
@@ -40,7 +43,19 @@ interface DeviceSummary {
 
 export default function DevicesPage() {
     const { toast } = useToast();
-    const { devices, isLoading, error, refetch, createDevice, updateDevice, deleteDevice, getDeviceSummary } = useDevices();
+    const {
+        devices,
+        isLoading,
+        error,
+        refetch,
+        createDevice,
+        updateDevice,
+        deleteDevice,
+        getDeviceSummary,
+        orderBy,
+        orderDirection,
+        changeOrder
+    } = useDevices();
     const {
         searchTerm, setSearchTerm,
         filters, setFilters,
@@ -55,6 +70,8 @@ export default function DevicesPage() {
     const [ isModalOpen, setIsModalOpen ] = React.useState(false);
     const [ selectedDevice, setSelectedDevice ] = React.useState<Device | null>(null);
     const [ isSubmitting, setIsSubmitting ] = useState(false);
+    const [ isViewModalOpen, setIsViewModalOpen ] = useState(false);
+    const [ deviceToView, setDeviceToView ] = useState<Device | null>(null);
     const [ advancedFilters, setAdvancedFilters ] = useState({});
     const [ isSyncing, setIsSyncing ] = useState(false);
     const formRef = React.useRef<HTMLFormElement>(null);
@@ -70,6 +87,16 @@ export default function DevicesPage() {
     const [ isLoadingSummary, setIsLoadingSummary ] = useState(true);
 
     const { sectors } = useSectors();
+    const { deviceType, isDesktop, showViewSelector, recommendedView } = useResponsiveDualView();
+
+    // Vista automática basada en el tamaño de pantalla
+    React.useEffect(() => {
+        if (!isDesktop) {
+            setViewMode('grid'); // En dispositivos no-desktop, siempre cards
+        } else {
+            setViewMode('list'); // En desktop, tabla por defecto
+        }
+    }, [ isDesktop ]);
 
     // Definir los grupos de filtros
     const filterGroups = React.useMemo(() => [
@@ -156,14 +183,19 @@ export default function DevicesPage() {
         }
     };
 
-    const handleDeviceFormSubmitSuccess = async (values: DeviceFormData) => {
+    const handleView = (device: Device) => {
+        setDeviceToView(device);
+        setIsViewModalOpen(true);
+    };
+
+    const handleDeviceFormSubmitSuccess = async (values: DeviceFormData | Omit<DeviceFormData, 'serialNumber'>) => {
         try {
             setIsSubmitting(true);
             if (selectedDevice) {
                 await updateDevice(selectedDevice.id, values);
                 toast({ title: "Dispositivo actualizado correctamente" });
             } else {
-                await createDevice(values);
+                await createDevice(values as DeviceFormData);
                 toast({ title: "Dispositivo creado correctamente" });
             }
             setIsModalOpen(false);
@@ -199,8 +231,8 @@ export default function DevicesPage() {
     };
 
     const deviceColumns = React.useMemo((): ColumnDef<Device>[] => {
-        return getDeviceColumns(handleEdit, handleDelete);
-    }, [ handleEdit, handleDelete ]);
+        return getDeviceColumns(handleEdit, handleDelete, handleView);
+    }, [ handleEdit, handleDelete, handleView ]);
 
     const isFetchingOrMutating = isLoading;
 
@@ -248,21 +280,24 @@ export default function DevicesPage() {
     return (
         <MainContainer>
             <HeaderActions title="Gestión de Dispositivos IoT">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={syncDeviceStates}
-                    disabled={isSyncing}
-                    className="gap-2"
-                >
-                    <RefreshCcw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                    {isSyncing ? 'Sincronizando...' : 'Sincronizar Estados'}
-                </Button>
-                <ReloadButton
-                    onClick={handleReload}
-                    isLoading={isFetchingOrMutating || isLoadingSummary}
-                />
-                <AddButton onClick={handleAdd} text="Agregar Dispositivo" />
+                <div className="flex items-center gap-4">
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={syncDeviceStates}
+                        disabled={isSyncing}
+                        className="gap-2"
+                    >
+                        <RefreshCcw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                        {isSyncing ? 'Sincronizando...' : 'Sincronizar Estados'}
+                    </Button>
+                    <ReloadButton
+                        onClick={handleReload}
+                        isLoading={isFetchingOrMutating || isLoadingSummary}
+                    />
+                    <AddButton onClick={handleAdd} text="Agregar Dispositivo" />
+                </div>
             </HeaderActions>
 
             {/* Cards informativos */}
@@ -313,6 +348,11 @@ export default function DevicesPage() {
                         searchPlaceholder="Buscar por nombre, serial, ubicación..."
                         actions={
                             <>
+                                <OrderSelector
+                                    orderBy={orderBy}
+                                    orderDirection={orderDirection}
+                                    onOrderChange={changeOrder}
+                                />
                                 <AdvancedFilters
                                     groups={filterGroups}
                                     onFiltersChange={handleAdvancedFiltersChange}
@@ -323,39 +363,79 @@ export default function DevicesPage() {
                             </>
                         }
                     />
-                    <ViewModeSwitcher viewMode={viewMode} setViewMode={(mode) => setViewMode(mode as "list" | "grid")} />
+                    {/* Solo mostrar selector de vista en laptop y desktop */}
+                    {showViewSelector && (
+                        <ViewModeSwitcher
+                            viewMode={viewMode}
+                            setViewMode={(mode) => setViewMode(mode as "list" | "grid")}
+                        />
+                    )}
                 </div>
             </div>
 
-            {viewMode === "list" ? (
-                <ResponsiveTable<Device>
-                    data={paginatedDevices}
-                    columns={deviceColumns}
-                    headers={[]}
-                    isLoading={isFetchingOrMutating}
-                    pagination={{
-                        onPaginationChange: handlePaginationChange,
-                        totalRecords: totalRecords,
-                        pageSize: pageSize,
-                        currentPage: currentPage
-                    }}
-                />
-            ) : (
-                <PaginatedCards
-                    data={paginatedDevices}
-                    totalRecords={totalRecords}
-                    pageSize={pageSize}
-                    onPaginationChange={handlePaginationChange}
-                    renderCard={(device: Device) => (
-                        <DeviceCard
-                            key={device.id}
-                            device={device}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
+            {/* Vista automática basada en dispositivo */}
+            {!isDesktop ? (
+                // En dispositivos móviles, tablets y laptops: siempre cards
+                <div>
+                    {isLoading ? (
+                        <div className="text-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground">Cargando dispositivos...</p>
+                        </div>
+                    ) : paginatedDevices && paginatedDevices.length > 0 ? (
+                        <PaginatedCards
+                            data={paginatedDevices}
+                            totalRecords={totalRecords}
+                            pageSize={pageSize}
+                            onPaginationChange={handlePaginationChange}
+                            renderCard={(device: Device) => (
+                                <DeviceCard
+                                    key={device.id}
+                                    device={device}
+                                    onEdit={handleEdit}
+                                    onDelete={handleDelete}
+                                />
+                            )}
+                            isLoading={isFetchingOrMutating}
                         />
+                    ) : (
+                        <div className="text-center py-8">
+                            <p className="text-muted-foreground">No hay dispositivos disponibles</p>
+                        </div>
                     )}
-                    isLoading={isFetchingOrMutating}
-                />
+                </div>
+            ) : (
+                // En desktop: permitir cambio entre tabla y cards
+                viewMode === "list" ? (
+                    <ResponsiveTable<Device>
+                        data={paginatedDevices}
+                        columns={deviceColumns}
+                        headers={[]}
+                        isLoading={isFetchingOrMutating}
+                        pagination={{
+                            onPaginationChange: handlePaginationChange,
+                            totalRecords: totalRecords,
+                            pageSize: pageSize,
+                            currentPage: currentPage
+                        }}
+                    />
+                ) : (
+                    <PaginatedCards
+                        data={paginatedDevices}
+                        totalRecords={totalRecords}
+                        pageSize={pageSize}
+                        onPaginationChange={handlePaginationChange}
+                        renderCard={(device: Device) => (
+                            <DeviceCard
+                                key={device.id}
+                                device={device}
+                                onEdit={handleEdit}
+                                onDelete={handleDelete}
+                            />
+                        )}
+                        isLoading={isFetchingOrMutating}
+                    />
+                )
             )}
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen} modal={false}>
@@ -404,7 +484,9 @@ export default function DevicesPage() {
                             <Button
                                 type="button"
                                 disabled={isSubmitting}
-                                onClick={handleSubmitFromButton}
+                                onClick={() => {
+                                    handleSubmitFromButton();
+                                }}
                             >
                                 {isSubmitting ? "Guardando..." : selectedDevice ? "Actualizar" : "Crear"}
                             </Button>
@@ -412,6 +494,18 @@ export default function DevicesPage() {
                     </ModalFooter>
                 </ModalContent>
             </Dialog>
+
+            {/* Modal de Vista de Equipos */}
+            {deviceToView && (
+                <EquipmentModal
+                    equipment={deviceToView}
+                    isOpen={isViewModalOpen}
+                    onClose={() => {
+                        setIsViewModalOpen(false);
+                        setDeviceToView(null);
+                    }}
+                />
+            )}
         </MainContainer>
     );
 } 

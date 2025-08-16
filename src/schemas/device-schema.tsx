@@ -24,7 +24,7 @@ export const deviceSchema = z.object({
     notes: z.string().optional().or(z.literal("")),
 });
 
-export const updateDeviceSchema = deviceSchema.partial();
+export const updateDeviceSchema = deviceSchema.partial().omit({ serialNumber: true });
 
 export type DeviceFormData = z.infer<typeof deviceSchema>
 export type UpdateDeviceFormData = z.infer<typeof updateDeviceSchema>

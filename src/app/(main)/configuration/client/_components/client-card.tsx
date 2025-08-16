@@ -219,7 +219,7 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
             topSection={topSectionContent}
             middleSection={middleSectionContent}
             bottomSection={bottomSectionContent}
-            className="flex flex-col min-h-[340px] h-full"
+            className="flex flex-col h-full"
         />
     );
 } 

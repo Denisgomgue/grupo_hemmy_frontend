@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import api from '@/lib/axios';
 
 interface AdvancePaymentData {
@@ -14,27 +14,17 @@ interface NextPaymentDateResponse {
 
 export const useAdvancePayment = () => {
     const [ isLoading, setIsLoading ] = useState(false);
-    const { toast } = useToast();
 
     const handleAdvancePayment = async (data: AdvancePaymentData) => {
         setIsLoading(true);
         try {
             const response = await api.post('/payments/advance-payment', data);
 
-            toast({
-                title: "Pago adelantado registrado",
-                description: "El pago adelantado se ha registrado correctamente.",
-                variant: "default",
-            });
-
+            toast.success("Pago adelantado registrado correctamente");
             return response.data;
         } catch (error) {
             console.error('Error al registrar pago adelantado:', error);
-            toast({
-                title: "Error",
-                description: "No se pudo registrar el pago adelantado. Por favor, intente nuevamente.",
-                variant: "destructive",
-            });
+            toast.error("No se pudo registrar el pago adelantado. Por favor, intente nuevamente.");
             throw error;
         } finally {
             setIsLoading(false);

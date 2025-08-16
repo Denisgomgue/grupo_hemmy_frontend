@@ -75,34 +75,34 @@ export function useInstallations() {
     const createInstallation = useCallback(async (installationData: any): Promise<Installation> => {
         try {
             const response = await api.post<Installation>("/installations", installationData);
-            await fetchInstallations();
+            // No llamar fetchInstallations aquí para evitar re-renders
             return mapInstallationFromApi(response.data);
         } catch (error) {
             console.error("Error creating installation:", error);
             throw error;
         }
-    }, [ fetchInstallations ]);
+    }, []);
 
     const updateInstallation = useCallback(async (id: number, installationData: any): Promise<Installation> => {
         try {
             const response = await api.patch<Installation>(`/installations/${id}`, installationData);
-            await fetchInstallations();
+            // No llamar fetchInstallations aquí para evitar re-renders
             return mapInstallationFromApi(response.data);
         } catch (error) {
             console.error("Error updating installation:", error);
             throw error;
         }
-    }, [ fetchInstallations ]);
+    }, []);
 
     const deleteInstallation = useCallback(async (id: number): Promise<void> => {
         try {
             await api.delete(`/installations/${id}`);
-            await fetchInstallations();
+            // No llamar fetchInstallations aquí para evitar re-renders
         } catch (error) {
             console.error("Error deleting installation:", error);
             throw error;
         }
-    }, [ fetchInstallations ]);
+    }, []);
 
     const getInstallationsByClient = useCallback(async (clientId: number): Promise<Installation[]> => {
         try {

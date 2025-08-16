@@ -31,19 +31,32 @@ export function useDevices() {
     const [ devices, setDevices ] = useState<Device[]>([])
     const [ isLoading, setIsLoading ] = useState(true)
     const [ error, setError ] = useState<string | null>(null)
+    const [ orderBy, setOrderBy ] = useState<'created' | 'updated'>('created')
+    const [ orderDirection, setOrderDirection ] = useState<'ASC' | 'DESC'>('DESC')
     const { user } = useAuth()
 
-    const fetchDevices = async () => {
+    const fetchDevices = async (orderByParam: 'created' | 'updated' = orderBy, orderDirectionParam: 'ASC' | 'DESC' = orderDirection) => {
         try {
             setIsLoading(true)
             setError(null)
-            const response = await api.get("/devices")
+            const response = await api.get("/devices", {
+                params: {
+                    orderBy: orderByParam,
+                    orderDirection: orderDirectionParam
+                }
+            })
             setDevices(response.data.map(mapDeviceFromApi))
         } catch (err: any) {
             setError(err.response?.data?.message || "Error al cargar dispositivos")
         } finally {
             setIsLoading(false)
         }
+    }
+
+    const changeOrder = (newOrderBy: 'created' | 'updated', newOrderDirection: 'ASC' | 'DESC' = 'DESC') => {
+        setOrderBy(newOrderBy)
+        setOrderDirection(newOrderDirection)
+        fetchDevices(newOrderBy, newOrderDirection)
     }
 
     const createDevice = async (deviceData: any): Promise<Device> => {
@@ -58,11 +71,11 @@ export function useDevices() {
 
     const updateDevice = async (id: number, deviceData: any): Promise<Device> => {
         try {
-            const response = await api.patch(`/devices/${id}`, deviceData)
-            await fetchDevices()
-            return mapDeviceFromApi(response.data)
+            const response = await api.patch(`/devices/${id}`, deviceData);
+            await fetchDevices();
+            return mapDeviceFromApi(response.data);
         } catch (err: any) {
-            throw new Error(err.response?.data?.message || "Error al actualizar dispositivo")
+            throw new Error(err.response?.data?.message || "Error al actualizar dispositivo");
         }
     }
 
@@ -137,7 +150,10 @@ export function useDevices() {
         devices,
         isLoading,
         error,
-        refetch: fetchDevices,
+        orderBy,
+        orderDirection,
+        refetch: () => fetchDevices(),
+        changeOrder,
         createDevice,
         updateDevice,
         deleteDevice,

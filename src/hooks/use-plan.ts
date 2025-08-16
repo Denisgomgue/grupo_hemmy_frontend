@@ -42,19 +42,20 @@ export function usePlans() {
     }, [])
 
     useEffect(() => {
-        const listener = () => setPlans([ ...planList ])
-        listeners.push(listener)
-        getMaxPrice() // Obtener el precio máximo al montar el componente
+        const listener = () => setPlans([ ...planList ]);
+        listeners.push(listener);
 
-        // Cargar planes automáticamente si no hay planes cargados
+        // Solo cargar si no hay planes
         if (planList.length === 0) {
-            refreshPlans()
+            refreshPlans();
         }
+
+        getMaxPrice();
 
         return () => {
-            listeners = listeners.filter((l) => l !== listener)
-        }
-    }, [ getMaxPrice, refreshPlans ])
+            listeners = listeners.filter((l) => l !== listener);
+        };
+    }, []); // Remover dependencias que causan re-renders
 
     return { plans, refreshPlans, maxPrice, getMaxPrice }
 }

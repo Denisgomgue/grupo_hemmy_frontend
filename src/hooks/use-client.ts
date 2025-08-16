@@ -86,34 +86,34 @@ export function useClient() {
     const createClient = useCallback(async (clientData: any): Promise<Client> => {
         try {
             const response = await ClientsAPI.create(clientData);
-            await refreshClient();
+            // No llamar refreshClient aquí para evitar re-renders
             return response;
         } catch (error) {
             console.error("Error creating client:", error);
             throw error;
         }
-    }, [ refreshClient ]);
+    }, []);
 
     const updateClient = useCallback(async (id: number, clientData: any): Promise<Client> => {
         try {
             const response = await ClientsAPI.update(id, clientData);
-            await refreshClient();
+            // No llamar refreshClient aquí para evitar re-renders
             return response;
         } catch (error) {
             console.error("Error updating client:", error);
             throw error;
         }
-    }, [ refreshClient ]);
+    }, []);
 
     const deleteClient = useCallback(async (id: number): Promise<void> => {
         try {
             await ClientsAPI.delete(id);
-            await refreshClient();
+            // No llamar refreshClient aquí para evitar re-renders
         } catch (error) {
             console.error("Error deleting client:", error);
             throw error;
         }
-    }, [ refreshClient ]);
+    }, []);
 
     const getClientSummary = useCallback(async () => {
         try {

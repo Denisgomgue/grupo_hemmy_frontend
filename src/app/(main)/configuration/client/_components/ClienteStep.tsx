@@ -233,17 +233,17 @@ export default function ClienteStep({ values, onChange, onValidationChange, onEx
     };
 
     // Manejar confirmación de cliente existente
-    const handleExistingClientConfirm = () => {
-        setShowExistingClientModal(false);
-        // Limpiar el error del DNI ya que se va a usar el cliente existente
-        setErrors(prev => ({ ...prev, dni: "" }));
-        setIsDniValid(true);
-        // Marcar el step como válido
-        onValidationChange?.(true);
-        if (onExistingClientFound && existingClient) {
-            onExistingClientFound(existingClient);
-        }
-    };
+    // const handleExistingClientConfirm = () => {
+    //     setShowExistingClientModal(false);
+    //     // Limpiar el error del DNI ya que se va a usar el cliente existente
+    //     setErrors(prev => ({ ...prev, dni: "" }));
+    //     setIsDniValid(true);
+    //     // Marcar el step como válido
+    //     onValidationChange?.(true);
+    //     if (onExistingClientFound && existingClient) {
+    //         onExistingClientFound(existingClient);
+    //     }
+    // };
 
     // Manejar cancelación de cliente existente
     const handleExistingClientCancel = () => {
@@ -477,15 +477,7 @@ export default function ClienteStep({ values, onChange, onValidationChange, onEx
                                     <div className="flex-1">
                                         <h4 className="font-semibold text-blue-900">
                                             {existingClient.name} {existingClient.lastName}
-                                        </h4>
-                                        <p className="text-sm text-blue-700">
-                                            DNI: {existingClient.dni}
-                                        </p>
-                                        {existingClient.phone && (
-                                            <p className="text-sm text-blue-700">
-                                                Teléfono: {existingClient.phone}
-                                            </p>
-                                        )}
+                                        </h4>                                
                                     </div>
                                     <Badge variant={existingClient.status === 'ACTIVE' ? 'default' : 'secondary'}>
                                         {existingClient.status === 'ACTIVE' ? 'Activo' :
@@ -498,11 +490,7 @@ export default function ClienteStep({ values, onChange, onValidationChange, onEx
                                 <div className="flex items-start gap-2">
                                     <Info className="h-4 w-4 text-yellow-600 mt-0.5" />
                                     <div className="text-sm text-yellow-800">
-                                        <p className="font-medium">¿Qué desea hacer?</p>
-                                        <ul className="mt-1 space-y-1">
-                                            <li>• <strong>Agregar instalación:</strong> Crear una nueva instalación para este cliente</li>
-                                            <li>• <strong>Cancelar:</strong> Ingresar un DNI diferente</li>
-                                        </ul>
+                                        <p className="font-medium">Proximamente se podrá agregar una instalación a este cliente</p>
                                     </div>
                                 </div>
                             </div>
@@ -512,9 +500,6 @@ export default function ClienteStep({ values, onChange, onValidationChange, onEx
                     <DialogFooter className="gap-2">
                         <Button variant="outline" onClick={handleExistingClientCancel}>
                             Cancelar
-                        </Button>
-                        <Button onClick={handleExistingClientConfirm}>
-                            Agregar Instalación
                         </Button>
                     </DialogFooter>
                 </DialogContent>

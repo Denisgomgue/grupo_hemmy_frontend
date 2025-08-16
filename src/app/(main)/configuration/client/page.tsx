@@ -35,7 +35,7 @@ import { PaginatedCards } from "@/components/dataTable/paginated-cards";
 import { ViewModeSwitcher } from "@/components/dataTable/view-mode-switcher";
 import { InfoSummaryCards } from "@/components/info-summary-cards";
 import { Users, UserCheck, UserPlus, UserX, Clock, RefreshCcw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { TableToolbar } from "@/components/dataTable/table-toolbar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -167,18 +167,18 @@ export default function ClientPage() {
     const { plans, refreshPlans } = usePlans();
     const { sectors, refreshSector } = useSectors();
 
-    // Cargar sectores inmediatamente al montar el componente
-    React.useEffect(() => {
-        refreshSector(1, 1000);
-    }, [ refreshSector ]);
-
     // Cargar planes y sectores cuando se abra el modal
     React.useEffect(() => {
         if (isModalOpen) {
             refreshPlans(1, 1000); // Cargar todos los planes
             refreshSector(1, 1000); // Cargar todos los sectores
         }
-    }, [ isModalOpen, refreshPlans, refreshSector ]);
+    }, [ isModalOpen ]); // Remover dependencias que causan re-renders
+
+    // Cargar sectores inmediatamente al montar el componente
+    React.useEffect(() => {
+        refreshSector(1, 1000);
+    }, []); // Solo ejecutar una vez al montar
 
     // Funciones auxiliares
     const deleteClientFn = async (id: number) => {
@@ -204,13 +204,8 @@ export default function ClientPage() {
         mutationFn: async () => {
             try {
                 setIsSyncing(true);
-                // Log removido para limpieza
 
                 const response = await api.post("/payments/sync-all-client-statuses");
-                // Log removido para limpieza
-
-                queryClient.invalidateQueries({ queryKey: [ "clients" ] });
-                queryClient.invalidateQueries({ queryKey: [ "clientSummary" ] });
 
                 // Mostrar mensaje detallado
                 const { syncedCount, totalChecked, recalculatedCount, details } = response.data;
@@ -224,12 +219,11 @@ export default function ClientPage() {
                         message = `✅ ${syncedCount} clientes sincronizados de ${totalChecked} verificados`;
                     }
                     toast.success(message);
-
-                    // Mostrar detalles en consola para debugging
-                    // Log removido para limpieza
                 } else {
                     toast.info("ℹ️ No se requirió recálculo ni sincronización para ningún cliente");
                 }
+
+                return response.data;
             } catch (error: any) {
                 console.error('❌ Error en sincronización masiva:', error);
                 const errorMessage = error.response?.data?.message || "No se pudieron actualizar los estados de los clientes.";
@@ -240,6 +234,7 @@ export default function ClientPage() {
             }
         },
         onSuccess: () => {
+            // Solo invalidar queries una vez aquí
             queryClient.invalidateQueries({ queryKey: [ "clients" ] });
             queryClient.invalidateQueries({ queryKey: [ "clientSummary" ] });
         },
@@ -325,7 +320,7 @@ export default function ClientPage() {
         if (step === 2) {
             setIsStepValid(true);
         }
-    }, [ step ]);
+    }, [ step ]); // Solo depender del step
 
     // Handler para generar pago
     const handleGenerarPago = () => {
@@ -1089,10 +1084,12 @@ export default function ClientPage() {
     };
 
     // Handler para recargar datos
-    const handleReload = () => {
+    const handleReload = useCallback(() => {
+        // Primero recargar clientes
         refetchClients();
+        // Luego sincronizar estados
         syncMutation.mutate();
-    };
+    }, [ refetchClients, syncMutation ]);
 
     // Definir headers para la vista móvil (CardTable)
     const clientHeaders = React.useMemo((): Header[] => [

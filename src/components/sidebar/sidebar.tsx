@@ -139,14 +139,14 @@ export function Sidebar({
           {!isCollapsed && (
             <>
               {sidebarColor === "hemmy" ? (
-                <img src="/logos/hm_logo.png" alt="Logo Hemmy" className="w-32" />
+                <img src="/logos/minilogo_grupo_hemmy.png" alt="Logo Hemmy" className="w-32" />
               ) : (
                 <>
                   {colorScheme === "dark" ? (
-                    <img src="/logos/logo_hemmy_white.jpg" alt="Logo Hemmy" className="w-32" />
+                    <img src="/logos/minilogo_grupo_hemmy.png" alt="Logo Hemmy" className="w-32" />
                   ) : (
                     // <h1 className="text-2xl font-bold text-[#5E3583]">Grupo Hemmy &copy;</h1>
-                    <img src="/logos/hm_logo.png" alt="Logo Hemmy" className="w-32" />
+                    <img src="/logos/minilogo_grupo_hemmy.png" alt="Logo Hemmy" className="w-32" />
                   )}
                 </>
               )}
