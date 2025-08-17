@@ -20,13 +20,18 @@ export function useClient() {
         }
     ) => {
         try {
-            const params: Record<string, any> = {
-                page,
-                limit: pageSize
-            };
+            // 🎯 SOLUCIÓN: Si hay búsqueda, resetear a página 1 y buscar en toda la BD
+            const params: Record<string, any> = {};
 
-            if (search) {
-                params.search = search;
+            if (search && search.trim()) {
+                // 🔍 BÚSQUEDA: Buscar en toda la base de datos
+                params.search = search.trim();
+                params.page = 1; // Siempre empezar en página 1
+                params.limit = pageSize;
+            } else {
+                // 📄 PAGINACIÓN NORMAL: Sin búsqueda, usar página actual
+                params.page = page;
+                params.limit = pageSize;
             }
 
             // Procesar filtros de estado

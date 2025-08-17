@@ -128,6 +128,9 @@ export default function ClientPage() {
         initialPaymentDate?: string;
     } | null>(null);
 
+    // 🎯 NUEVO: Estado de carga para búsquedas
+    const [ isSearching, setIsSearching ] = useState(false);
+
     // Datos del formulario
     const [ clienteData, setClienteData ] = useState<Partial<ClientFormData>>({});
     const [ instalacionData, setInstalacionData ] = useState<Partial<InstallationFormData>>({});
@@ -179,6 +182,13 @@ export default function ClientPage() {
     React.useEffect(() => {
         refreshSector(1, 1000);
     }, []); // Solo ejecutar una vez al montar
+
+    // 🎯 NUEVO: Efecto para desactivar estado de búsqueda
+    React.useEffect(() => {
+        if (clientsQuery && !isFetchingClients) {
+            setIsSearching(false);
+        }
+    }, [ clientsQuery, isFetchingClients ]);
 
     // Funciones auxiliares
     const deleteClientFn = async (id: number) => {
@@ -1073,14 +1083,27 @@ export default function ClientPage() {
     };
 
     // Handler para búsqueda
-    const handleSearch = () => {
-        setCurrentPage(1); // Resetear a la primera página al buscar
+    const handleSearch = async () => {
+        // 🎯 SOLUCIÓN: Resetear a la primera página cuando se busca
+        setCurrentPage(1);
+
+        // 🎯 NUEVO: Activar estado de carga para búsquedas
+        if (searchTerm.trim()) {
+            setIsSearching(true);
+
+            // Pequeño delay para mostrar el loading (opcional)
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // La búsqueda se ejecutará automáticamente por el useQuery
+            // El estado de carga se desactivará cuando se complete
+        }
     };
 
     // Handler para filtros avanzados
     const handleAdvancedFiltersChange = (newFilters: any) => {
         setAdvancedFilters(newFilters);
-        setCurrentPage(1); // Resetear a la primera página al cambiar filtros
+        // 🎯 SOLUCIÓN: Resetear a la primera página al cambiar filtros
+        setCurrentPage(1);
     };
 
     // Handler para recargar datos
@@ -1259,6 +1282,13 @@ export default function ClientPage() {
                                 </>
                             }
                         />
+                        {/* 🎯 NUEVO: Indicador de búsqueda activa */}
+                        {isSearching && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                                <span>Buscando clientes...</span>
+                            </div>
+                        )}
                     </div>
                     {showViewSelector && (
                         <div className={`${isDesktop ? 'ml-4' : 'mt-4'}`}>
@@ -1283,7 +1313,7 @@ export default function ClientPage() {
                             onEdit={handleEdit}
                         />
                     )}
-                    isLoading={isFetchingOrMutating}
+                    isLoading={isFetchingOrMutating || isSearching}
                 />
             ) : (
                 // En desktop: permitir cambio entre tabla y cards
@@ -1292,7 +1322,7 @@ export default function ClientPage() {
                         data={clientsQuery?.data ?? []}
                         columns={clientColumns}
                         headers={clientHeaders}
-                        isLoading={isFetchingOrMutating}
+                        isLoading={isFetchingOrMutating || isSearching}
                         pagination={{
                             onPaginationChange: handlePaginationChange,
                             totalRecords: clientsQuery?.total || 0,
@@ -1313,7 +1343,7 @@ export default function ClientPage() {
                                 onEdit={handleEdit}
                             />
                         )}
-                        isLoading={isFetchingOrMutating}
+                        isLoading={isFetchingOrMutating || isSearching}
                     />
                 )
             )}
